@@ -36,18 +36,41 @@ export function OpsPanel() {
   const disabled = current?.admin === "Disabled";
 
   async function resetAdapter() {
+    console.log("[OpsPanel] Reset adapter called, closing dialog");
     setConfirm(false);
+    
+    if (!iface) {
+      const msg = lang === "fa" ? "آداپتور انتخاب نشده است" : "No adapter selected";
+      log(msg, "err");
+      toast.error(msg);
+      console.error("[OpsPanel] No interface selected");
+      return;
+    }
+    
     if (disabled) {
       const msg = t.adapterDisabled;
       log(msg, "err");
       toast.error(msg);
+      console.error("[OpsPanel] Adapter is disabled:", iface);
       return;
     }
+    
+    console.log("[OpsPanel] Starting adapter reset for:", iface);
+    const steps = adapterResetSteps(iface);
+    console.log("[OpsPanel] Reset steps:", steps.length);
+    
     const ok = await runProtocol(
-      adapterResetSteps(iface),
+      steps,
       lang === "fa" ? "ریست آداپتور و DNS انجام شد." : "Adapter and DNS reset executed.",
     );
-    if (ok) toast.success(t.opsReset);
+    
+    console.log("[OpsPanel] Reset completed, success:", ok);
+    
+    if (ok) {
+      toast.success(t.opsReset);
+    } else {
+      toast.error(lang === "fa" ? "ریست آداپتور ناموفق بود" : "Adapter reset failed");
+    }
   }
 
   async function resetDns() {
@@ -89,7 +112,10 @@ export function OpsPanel() {
       icon: RotateCcw,
       title: t.opsReset,
       hint: t.opsResetHint,
-      onClick: () => setConfirm(true),
+      onClick: () => {
+        console.log("[OpsPanel] Reset button clicked, opening confirmation dialog");
+        setConfirm(true);
+      },
       variant: "danger" as const,
     },
     {

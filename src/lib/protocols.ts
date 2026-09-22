@@ -4,6 +4,7 @@ export interface ProtocolStep {
   messageFa: string;
   cmd: string;
   waitMs?: number;
+  waitAfterMs?: number;
 }
 
 export function setDnsSteps(iface: string, dns1: string, dns2: string): ProtocolStep[] {
@@ -13,6 +14,7 @@ export function setDnsSteps(iface: string, dns1: string, dns2: string): Protocol
       message: `Injecting Primary DNS: ${dns1}...`,
       messageFa: `تزریق DNS اصلی: ${dns1}...`,
       cmd: `netsh interface ip set dns "${iface}" static ${dns1}`,
+      waitAfterMs: 500,
     },
     {
       id: "secondary",
@@ -30,37 +32,42 @@ export function adapterResetSteps(iface: string): ProtocolStep[] {
       message: "Wiping DNS cache...",
       messageFa: "پاک‌سازی کش DNS...",
       cmd: "ipconfig /flushdns",
+      waitAfterMs: 200,
     },
     {
       id: "ipreset",
       message: "Resetting IP configuration...",
       messageFa: "ریست پیکربندی IP...",
       cmd: "netsh int ip reset",
+      waitAfterMs: 500,
     },
     {
       id: "disable",
       message: "Disabling network adapter...",
       messageFa: "خاموش کردن آداپتور...",
       cmd: `netsh interface set interface "${iface}" disable`,
+      waitAfterMs: 1000,
     },
     {
       id: "enable",
       message: "Enabling network adapter...",
       messageFa: "روشن کردن آداپتور...",
       cmd: `netsh interface set interface "${iface}" enable`,
-      waitMs: 400,
+      waitAfterMs: 2000,
     },
     {
       id: "release",
       message: "Releasing IP...",
       messageFa: "رهاسازی IP...",
       cmd: "ipconfig /release",
+      waitAfterMs: 500,
     },
     {
       id: "renew",
       message: "Renewing IP...",
       messageFa: "دریافت IP جدید...",
       cmd: "ipconfig /renew",
+      waitAfterMs: 500,
     },
     {
       id: "register",

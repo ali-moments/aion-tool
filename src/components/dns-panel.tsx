@@ -36,6 +36,7 @@ export function DnsPanel() {
   const [primary, setPrimary] = useState("");
   const [secondary, setSecondary] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [injectingId, setInjectingId] = useState<string | null>(null);
 
   const list = useMemo(
     () => DNS_PROVIDERS.filter((p) => filter === "all" || p.tags.includes(filter)),
@@ -57,10 +58,12 @@ export function DnsPanel() {
   const canGoNext = currentPage < totalPages;
 
   async function inject(name: string, a: string, b: string, providerId?: string) {
+    setInjectingId(providerId || "custom");
     const ok = await runProtocol(
       setDnsSteps(iface, a, b),
       lang === "fa" ? `DNS اعمال شد: ${a}, ${b}` : `DNS injection complete: ${a}, ${b}`,
     );
+    setInjectingId(null);
     if (ok) {
       setDns({ source: "static", primary: a, secondary: b, providerId });
       toast.success(lang === "fa" ? `${name} روی ${iface}` : `${name} on ${iface}`);
@@ -68,11 +71,20 @@ export function DnsPanel() {
   }
 
   async function applyCustom() {
-    if (!isIpv4(primary) || !isIpv4(secondary)) {
+    const trimmedPrimary = primary.trim();
+    const trimmedSecondary = secondary.trim();
+    
+    if (!trimmedPrimary || !isIpv4(trimmedPrimary)) {
       toast.error(t.invalidIp);
       return;
     }
-    await inject(t.customDns, primary.trim(), secondary.trim());
+    
+    if (!trimmedSecondary || !isIpv4(trimmedSecondary)) {
+      toast.error(t.invalidIp);
+      return;
+    }
+    
+    await inject(t.customDns, trimmedPrimary, trimmedSecondary);
   }
 
   return (
@@ -138,12 +150,12 @@ export function DnsPanel() {
                   </div>
                   <Button
                     className="mt-4 w-full"
-                    disabled={busy}
+                    disabled={busy || injectingId !== null}
                     variant={active ? "secondary" : "default"}
                     onClick={() => inject(label, p.primary, p.secondary, p.id)}
                   >
                     {active ? <Check className="size-4" /> : null}
-                    {busy ? t.injecting : t.inject}
+                    {injectingId === p.id ? t.injecting : t.inject}
                   </Button>
                 </Card>
               );
@@ -219,7 +231,7 @@ export function DnsPanel() {
             />
           </div>
         </div>
-        <Button className="mt-4" disabled={busy} onClick={applyCustom}>
+        <Button className="mt-4" disabled={busy || injectingId !== null} onClick={applyCustom}>
           {t.applyCustom}
         </Button>
       </Card>

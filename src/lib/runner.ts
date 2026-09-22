@@ -70,6 +70,11 @@ export async function runProtocol(steps: ProtocolStep[], doneMessage?: string) {
 
       // Command succeeded
       log(lang === "fa" ? "انجام شد." : "Done.", "ok");
+      
+      // Wait after execution if specified
+      if (step.waitAfterMs) {
+        await sleep(step.waitAfterMs);
+      }
     }
 
     // All steps completed successfully

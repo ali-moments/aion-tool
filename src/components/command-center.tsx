@@ -28,7 +28,7 @@ const NAV: Array<{ id: ViewId; icon: typeof Globe; key: keyof typeof STR.fa }> =
   { id: "ops", icon: Radar, key: "navOps" },
   { id: "ping", icon: Gauge, key: "navPing" },
   { id: "race", icon: Wifi, key: "navRace" },
-  { id: "kit", icon: Monitor, key: "navKit" },
+  // { id: "kit", icon: Monitor, key: "navKit" }, // Disabled - Windows download page not currently used
 ];
 
 function Clock() {

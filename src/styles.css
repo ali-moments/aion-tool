@@ -55,6 +55,37 @@
   p {
     text-wrap: pretty;
   }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-surface);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--color-primary) 25%, transparent);
+    border-radius: 4px;
+    transition: background 150ms ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--color-primary) 45%, transparent);
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: color-mix(in oklab, var(--color-primary) 60%, transparent);
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--color-primary) 25%, transparent) var(--color-surface);
+  }
 }
 
 .hud-grid {

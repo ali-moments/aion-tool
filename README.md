@@ -44,7 +44,7 @@ A powerful Electron-based desktop application for managing DNS settings, network
 
 ### For Users
 
-Download the latest installer from the [Releases](https://github.com/TheYoqaizo/aion-tool/releases) page:
+Download the latest installer from the [Releases](https://github.com/ali-moments/aion-tool/releases) page:
 
 - **Windows**: `AION-TOOL-Setup-x.x.x.exe`
 
@@ -66,7 +66,7 @@ Run the installer and follow the on-screen instructions.
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/TheYoqaizo/aion-tool.git
+   git clone https://github.com/ali-moments/aion-tool.git
    cd aion-tool
    ```
 
@@ -221,11 +221,17 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-## 👤 Author
+## 👥 Credits
 
-**TheYoqaizo**
+### Concept & Design
+**TheYoqaizo** - Original idea and concept creator
 
-- GitHub: [@TheYoqaizo](https://github.com/TheYoqaizo)
+- GitHub: [@Yoqaizo](https://github.com/Yoqaizo)
+
+### Development
+**Momento** - Lead developer and implementation
+
+- Github: [@ali-moments](https://github.com/ali-moments)
 
 ---
 
@@ -258,8 +264,8 @@ This tool modifies system network settings. Use at your own risk. Always ensure 
 
 ## 🐛 Bug Reports & Feature Requests
 
-Found a bug or have a feature request? Please open an issue on the [GitHub Issues](https://github.com/TheYoqaizo/aion-tool/issues) page.
+Found a bug or have a feature request? Please open an issue on the [GitHub Issues](https://github.com/ali-moments/aion-tool/issues) page.
 
 ---
 
-**Made with ❤️ by TheYoqaizo**
+**Concept by TheYoqaizo • Developed by Ali**

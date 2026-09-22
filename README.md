@@ -268,4 +268,4 @@ Found a bug or have a feature request? Please open an issue on the [GitHub Issue
 
 ---
 
-**Concept by TheYoqaizo • Developed by Ali**
+**Concept by TheYoqaizo • Developed by Momento**

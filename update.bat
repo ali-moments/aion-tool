@@ -1,4 +1,5 @@
 @echo off
 
 git pull
-pnpm run electron:build
+pnpm build
+pnpm run electron:dev

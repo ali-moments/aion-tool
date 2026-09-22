@@ -150,7 +150,7 @@ export function currentDnsCmd(iface: string) {
 
 export function applyScript(iface: string, dns1: string, dns2: string) {
   return [
-    "# AIOT00L — apply DNS (run PowerShell as Administrator)",
+    "# AION TOOL — apply DNS (run PowerShell as Administrator)",
     `$iface = ${JSON.stringify(iface)}`,
     `netsh interface ip set dns $iface static ${dns1}`,
     `netsh interface ip add dns $iface ${dns2} index=2`,

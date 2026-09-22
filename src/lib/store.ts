@@ -138,7 +138,7 @@ export const useApp = create<AppState>()(
       clearLogs: () => set({ logs: [] }),
     }),
     {
-      name: "aiotool-v1",
+      name: "aion-tool-v1",
       partialize: (s) => ({
         lang: s.lang,
         iface: s.iface,

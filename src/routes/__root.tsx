@@ -2,7 +2,7 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "AIOT00L";
+const APP_NAME = "AION TOOL";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -13,7 +13,7 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#070A09" },
       {
         name: "description",
-        content: "AIOT00L Network Command Center — DNS, adapter reset, ping. Created by TheYoqaizo.",
+        content: "AION TOOL Network Command Center — DNS, adapter reset, ping. Created by TheYoqaizo.",
       },
     ],
     links: [

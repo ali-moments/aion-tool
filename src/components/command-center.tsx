@@ -235,7 +235,6 @@ export function CommandCenter() {
 
             <aside className="hidden w-[22rem] shrink-0 lg:block">
               <ConsolePanel />
-              <p className="mt-3 px-1 text-xs text-muted">{t.createdBy}</p>
             </aside>
           </div>
 
@@ -243,7 +242,7 @@ export function CommandCenter() {
             <ConsolePanel />
           </div>
 
-          <footer className="mt-4 hidden items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted sm:flex">
+          <footer className="mt-4 mb-20 flex flex-col gap-2 border-t border-border pt-3 text-xs text-muted lg:mb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <span className="inline-flex items-center gap-2">
               <TerminalSquare className="size-3.5" />
               {t.previewMode} · {t.liveLink} {t.online}
@@ -252,6 +251,7 @@ export function CommandCenter() {
               {t.lastOp}: {lastOp || t.none}
               {provider ? ` · ${lang === "fa" ? provider.nameFa : provider.name}` : ""}
             </span>
+            <span className="text-muted/70">{t.createdBy}</span>
           </footer>
         </div>
 

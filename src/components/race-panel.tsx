@@ -80,34 +80,36 @@ export function RacePanel() {
       </Card>
 
       {ranked.length > 0 ? (
-        <div className="space-y-2">
-          {ranked.map((r, i) => {
-            const p = DNS_PROVIDERS.find((x) => x.id === r.id);
-            if (!p) return null;
-            const pct = r.ms && best ? Math.max(8, Math.min(100, (best / r.ms) * 100)) : 0;
-            return (
-              <Card key={r.id} className={cn("p-3", i === 0 && r.ms != null && "border-primary")}>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-display tracking-wide">
-                      {lang === "fa" ? p.nameFa : p.name}
+        <Card className="overflow-hidden p-0">
+          <div className="max-h-[500px] space-y-2 overflow-y-auto p-3">
+            {ranked.map((r, i) => {
+              const p = DNS_PROVIDERS.find((x) => x.id === r.id);
+              if (!p) return null;
+              const pct = r.ms && best ? Math.max(8, Math.min(100, (best / r.ms) * 100)) : 0;
+              return (
+                <Card key={r.id} className={cn("p-3", i === 0 && r.ms != null && "border-primary")}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-display tracking-wide">
+                        {lang === "fa" ? p.nameFa : p.name}
+                      </p>
+                      <p className="font-mono text-xs text-muted">{p.primary}</p>
+                    </div>
+                    <p
+                      className={cn(
+                        "font-mono text-sm tabular-nums",
+                        r.ms == null ? "text-danger" : "text-primary",
+                      )}
+                    >
+                      {r.ms == null ? t.probeFail : formatMs(r.ms)}
                     </p>
-                    <p className="font-mono text-xs text-muted">{p.primary}</p>
                   </div>
-                  <p
-                    className={cn(
-                      "font-mono text-sm tabular-nums",
-                      r.ms == null ? "text-danger" : "text-primary",
-                    )}
-                  >
-                    {r.ms == null ? t.probeFail : formatMs(r.ms)}
-                  </p>
-                </div>
-                <Progress className="mt-2" value={pct} />
-              </Card>
-            );
-          })}
-        </div>
+                  <Progress className="mt-2" value={pct} />
+                </Card>
+              );
+            })}
+          </div>
+        </Card>
       ) : null}
     </div>
   );

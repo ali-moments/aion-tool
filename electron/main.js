@@ -139,6 +139,10 @@ async function createWindow(serverUrl) {
     mainWindow = new BrowserWindow({
         width: 1280,
         height: 800,
+        minWidth: 900,
+        minHeight: 600,
+        maxWidth: 1920,
+        maxHeight: 1200,
         webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,

@@ -33,6 +33,7 @@ export function PingPanel() {
   const t = STR[lang];
   const [host, setHost] = useState("1.1.1.1");
   const [count, setCount] = useState(4);
+  const [customCount, setCustomCount] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
 
   const sent = rows.length;
@@ -45,17 +46,22 @@ export function PingPanel() {
 
   async function run() {
     if (busy) return;
+    const finalCount = count;
+    if (finalCount < 1 || finalCount > 100) {
+      toast.error(lang === "fa" ? "تعداد باید بین ۱ تا ۱۰۰ باشد" : "Count must be between 1 and 100");
+      return;
+    }
     setBusy(true);
     setRows([]);
     log(
       lang === "fa"
-        ? `شروع پینگ ${host} × ${count}`
-        : `Initiating ping test to ${host} × ${count}...`,
+        ? `شروع پینگ ${host} × ${finalCount}`
+        : `Initiating ping test to ${host} × ${finalCount}...`,
       "info",
     );
-    log(`ping ${host} -n ${count}`, "cmd");
+    log(`ping ${host} -n ${finalCount}`, "cmd");
     const next: Row[] = [];
-    for (let i = 1; i <= count; i++) {
+    for (let i = 1; i <= finalCount; i++) {
       const ms = await probe(host);
       const row = { n: i, ms };
       next.push(row);
@@ -94,13 +100,36 @@ export function PingPanel() {
                   key={n}
                   type="button"
                   size="sm"
-                  variant={count === n ? "default" : "secondary"}
-                  onClick={() => setCount(n)}
+                  variant={count === n && !customCount ? "default" : "secondary"}
+                  onClick={() => {
+                    setCount(n);
+                    setCustomCount("");
+                  }}
                 >
                   {n}
                 </Button>
               ))}
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="custom-count">{lang === "fa" ? "سفارشی" : "Custom"}</Label>
+            <Input
+              id="custom-count"
+              type="number"
+              min="1"
+              max="100"
+              value={customCount}
+              onChange={(e) => {
+                setCustomCount(e.target.value);
+                const num = parseInt(e.target.value, 10);
+                if (num >= 1 && num <= 100) {
+                  setCount(num);
+                }
+              }}
+              placeholder="1-100"
+              className="w-20"
+              inputMode="numeric"
+            />
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -131,7 +160,7 @@ export function PingPanel() {
 
       {rows.length > 0 ? (
         <Card className="overflow-hidden p-0">
-          <div className="divide-y divide-border font-mono text-sm">
+          <div className="max-h-[400px] divide-y divide-border overflow-y-auto font-mono text-sm">
             {rows.map((r) => (
               <div key={r.n} className="flex items-center justify-between px-4 py-2.5">
                 <span className="text-muted">#{r.n}</span>

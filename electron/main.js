@@ -21,18 +21,18 @@ ipcMain.handle("execute-command", async (event, command) => {
     // Security: Validate command is from allowed list
     const allowedPrefixes = ['netsh', 'ipconfig', 'ping'];
     const cmdLower = command.trim().toLowerCase();
-    
+
     if (!allowedPrefixes.some(prefix => cmdLower.startsWith(prefix))) {
         console.error(`[IPC] Blocked unauthorized command: ${command}`);
-        return { 
-            success: false, 
+        return {
+            success: false,
             error: "Command not permitted for security reasons"
         };
     }
 
     try {
         console.log(`[IPC] Executing command: ${command}`);
-        
+
         const { stdout, stderr } = await execAsync(command, {
             windowsHide: true,
             timeout: 30000, // 30 second timeout
@@ -43,15 +43,15 @@ ipcMain.handle("execute-command", async (event, command) => {
         }
 
         console.log(`[IPC] Command completed successfully`);
-        return { 
-            success: true, 
+        return {
+            success: true,
             output: stdout,
             error: stderr || undefined
         };
     } catch (error) {
         console.error(`[IPC] Command failed:`, error);
-        return { 
-            success: false, 
+        return {
+            success: false,
             error: error.message,
             output: error.stdout || undefined
         };
@@ -65,11 +65,11 @@ ipcMain.handle("execute-command", async (event, command) => {
 ipcMain.handle("get-network-interfaces", async (event) => {
     try {
         console.log(`[IPC] Fetching network interfaces...`);
-        
+
         const command = process.platform === "win32"
             ? "netsh interface show interface"
             : "ip -o link show"; // Linux/Mac fallback
-        
+
         const { stdout } = await execAsync(command, {
             windowsHide: true,
             timeout: 10000,
@@ -89,7 +89,7 @@ ipcMain.handle("get-network-interfaces", async (event) => {
                 if (parts.length >= 4) {
                     const [adminState, state, type, ...nameParts] = parts;
                     const name = nameParts.join(" ").trim();
-                    
+
                     if (name) {
                         adapters.push({
                             name,
@@ -127,8 +127,8 @@ ipcMain.handle("get-network-interfaces", async (event) => {
         }
     } catch (error) {
         console.error(`[IPC] Failed to get network interfaces:`, error);
-        return { 
-            success: false, 
+        return {
+            success: false,
             error: error.message,
             adapters: []
         };
@@ -139,8 +139,8 @@ async function createWindow(serverUrl) {
     mainWindow = new BrowserWindow({
         width: 1280,
         height: 800,
-        minWidth: 900,
-        minHeight: 600,
+        minWidth: 500,
+        minHeight: 500,
         maxWidth: 1920,
         maxHeight: 1200,
         webPreferences: {
@@ -169,7 +169,7 @@ async function createWindow(serverUrl) {
         await mainWindow.loadURL(serverUrl);
     } catch (err) {
         console.error("Failed to load URL:", err);
-        
+
         // Show error dialog
         const { dialog } = await import("electron");
         dialog.showErrorBox(
@@ -186,7 +186,7 @@ app.whenReady().then(async () => {
         await createWindow(url);
     } catch (err) {
         console.error("Failed to start application:", err);
-        
+
         const { dialog } = await import("electron");
         dialog.showErrorBox(
             "Startup Error",

@@ -46,7 +46,7 @@ A powerful Electron-based desktop application for managing DNS settings, network
 
 Download the latest installer from the [Releases](https://github.com/TheYoqaizo/aion-tool/releases) page:
 
-- **Windows**: `AION-TOOL-Setup-1.0.0.exe`
+- **Windows**: `AION-TOOL-Setup-x.x.x.exe`
 
 Run the installer and follow the on-screen instructions.
 
@@ -117,9 +117,9 @@ pnpm format
 ```bash
 pnpm electron:build
 ```
-Creates installer in `dist/` directory:
-- `AION TOOL Setup 1.0.0.exe` - Installer
-- `AION TOOL 1.0.0.exe` - Portable executable
+Creates installer in `release/` directory:
+- `AION TOOL Setup x.x.x.exe` - Installer
+- `win-unpacked/AION TOOL x.x.x.exe` - Portable executable
 
 #### Build for All Platforms
 ```bash

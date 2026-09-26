@@ -48,7 +48,7 @@ export function RacePanel() {
     if (busy) return;
     setBusy(true);
     setResults([]);
-    log(lang === "fa" ? "شروع رقابت DNS…" : "DNS race started…", "info");
+    log(lang === "fa" ? "شروع مقایسه DNS…" : "DNS comparison started…", "info");
     const settled = await Promise.all(
       DNS_PROVIDERS.map(async (p) => {
         const ms = await probeIp(p.primary);

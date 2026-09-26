@@ -3,8 +3,11 @@ import { persist } from "zustand/middleware";
 import { DEFAULT_ADAPTERS } from "@/lib/dns-providers";
 import type { Lang } from "@/lib/i18n";
 import { nowStamp } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 export type ViewId = "dns" | "ops" | "ping" | "race" | "kit";
+
+export type DnsMode = "fast" | "optimize";
 
 export interface Adapter {
   name: string;
@@ -29,6 +32,7 @@ export interface DnsState {
 interface AppState {
   lang: Lang;
   view: ViewId;
+  dnsMode: DnsMode;
   bootDone: boolean;
   iface: string;
   adapters: Adapter[];
@@ -39,6 +43,7 @@ interface AppState {
   logSeq: number;
   setLang: (lang: Lang) => void;
   setView: (view: ViewId) => void;
+  setDnsMode: (mode: DnsMode) => void;
   setBootDone: () => void;
   setIface: (name: string) => void;
   setBusy: (busy: boolean) => void;
@@ -56,6 +61,7 @@ export const useApp = create<AppState>()(
     (set, get) => ({
       lang: "fa",
       view: "dns",
+      dnsMode: "fast",
       bootDone: false,
       iface: "Ethernet",
       adapters: DEFAULT_ADAPTERS,
@@ -65,11 +71,30 @@ export const useApp = create<AppState>()(
       logs: [],
       logSeq: 0,
       setLang: (lang) => set({ lang }),
-      setView: (view) => set({ view }),
-      setBootDone: () => set({ bootDone: true }),
-      setIface: (iface) => set({ iface }),
-      setBusy: (busy) => set({ busy }),
-      setDns: (dns) => set({ dns }),
+      setView: (view) => {
+        logger.info('STORE', `View changed to: ${view}`);
+        set({ view });
+      },
+      setDnsMode: (dnsMode) => {
+        logger.info('STORE', `DNS mode changed to: ${dnsMode}`);
+        set({ dnsMode });
+      },
+      setBootDone: () => {
+        logger.info('STORE', 'Application boot completed');
+        set({ bootDone: true });
+      },
+      setIface: (iface) => {
+        logger.info('STORE', `Interface changed to: ${iface}`);
+        set({ iface });
+      },
+      setBusy: (busy) => {
+        logger.debug('STORE', `Busy state changed to: ${busy}`);
+        set({ busy });
+      },
+      setDns: (dns) => {
+        logger.info('STORE', `DNS configuration updated`, dns);
+        set({ dns });
+      },
       setLastOp: (lastOp) => set({ lastOp }),
       setAdapterAdmin: (name, admin) =>
         set({
@@ -95,10 +120,12 @@ export const useApp = create<AppState>()(
         // Check if Electron API is available
         if (typeof window === "undefined" || !window.electronAPI?.getNetworkInterfaces) {
           console.warn("[Store] Electron API not available, using default adapters");
+          logger.warn('STORE', 'Electron API not available, using default adapters');
           return false;
         }
 
         try {
+          logger.debug('STORE', 'Refreshing network adapters');
           const result = await window.electronAPI.getNetworkInterfaces();
           
           if (result.success && result.adapters && result.adapters.length > 0) {
@@ -118,13 +145,19 @@ export const useApp = create<AppState>()(
               iface: newIface,
             });
             
+            logger.info('STORE', `Refreshed ${newAdapters.length} network interfaces`, { 
+              count: newAdapters.length, 
+              selectedInterface: newIface 
+            });
             console.log(`[Store] Refreshed ${newAdapters.length} network interfaces`);
             return true;
           } else {
+            logger.error('STORE', 'Failed to fetch network interfaces', { error: result.error });
             console.error("[Store] Failed to fetch network interfaces:", result.error);
             return false;
           }
         } catch (error) {
+          logger.error('STORE', 'Error refreshing adapters', { error });
           console.error("[Store] Error refreshing adapters:", error);
           return false;
         }
@@ -142,6 +175,7 @@ export const useApp = create<AppState>()(
       partialize: (s) => ({
         lang: s.lang,
         iface: s.iface,
+        dnsMode: s.dnsMode,
         adapters: s.adapters,
         dns: s.dns,
         bootDone: s.bootDone,

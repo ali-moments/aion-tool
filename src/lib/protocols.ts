@@ -14,6 +14,25 @@ export function setDnsSteps(iface: string, dns1: string, dns2: string): Protocol
       message: `Injecting Primary DNS: ${dns1}...`,
       messageFa: `تزریق DNS اصلی: ${dns1}...`,
       cmd: `netsh interface ip set dns "${iface}" static ${dns1}`,
+      waitAfterMs: 50, // Reduced from 200ms for fast mode
+    },
+    {
+      id: "secondary",
+      message: `Injecting Secondary DNS: ${dns2}...`,
+      messageFa: `تزریق DNS فرعی: ${dns2}...`,
+      cmd: `netsh interface ip add dns "${iface}" ${dns2} index=2`,
+      waitAfterMs: 25, // Minimal delay for command completion
+    },
+  ];
+}
+
+export function setDnsOptimizedSteps(iface: string, dns1: string, dns2: string): ProtocolStep[] {
+  return [
+    {
+      id: "primary",
+      message: `Injecting Primary DNS: ${dns1}...`,
+      messageFa: `تزریق DNS اصلی: ${dns1}...`,
+      cmd: `netsh interface ip set dns "${iface}" static ${dns1}`,
       waitAfterMs: 500,
     },
     {
@@ -21,6 +40,34 @@ export function setDnsSteps(iface: string, dns1: string, dns2: string): Protocol
       message: `Injecting Secondary DNS: ${dns2}...`,
       messageFa: `تزریق DNS فرعی: ${dns2}...`,
       cmd: `netsh interface ip add dns "${iface}" ${dns2} index=2`,
+      waitAfterMs: 300,
+    },
+    {
+      id: "flush",
+      message: "Flushing DNS cache...",
+      messageFa: "پاک‌سازی کش DNS...",
+      cmd: "ipconfig /flushdns",
+      waitAfterMs: 200,
+    },
+    {
+      id: "release",
+      message: "Releasing IP configuration...",
+      messageFa: "آزادسازی IP...",
+      cmd: "ipconfig /release",
+      waitAfterMs: 500,
+    },
+    {
+      id: "renew",
+      message: "Renewing IP configuration...",
+      messageFa: "تجدید IP...",
+      cmd: "ipconfig /renew",
+      waitAfterMs: 500,
+    },
+    {
+      id: "register",
+      message: "Registering DNS...",
+      messageFa: "ثبت مجدد DNS...",
+      cmd: "ipconfig /registerdns",
     },
   ];
 }

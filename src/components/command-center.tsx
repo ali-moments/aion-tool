@@ -129,9 +129,17 @@ export function CommandCenter() {
                 />
                 {busy ? t.statusBusy : t.statusReady}
               </span>
-              <span className="hidden rounded-sm border border-border bg-elevated px-2.5 py-1 font-mono text-xs uppercase tracking-wider text-muted sm:inline">
-                {t.statusAdmin}
+              
+              {/* Current DNS Display */}
+              <span className="hidden rounded-sm border border-border bg-elevated px-2.5 py-1 font-mono text-xs tracking-wider text-muted sm:inline-flex items-center gap-1.5">
+                <span className="text-primary">DNS:</span>
+                {dns.source === "dhcp" ? (
+                  <span>{t.dhcp}</span>
+                ) : (
+                  <span>{dns.primary || "—"}</span>
+                )}
               </span>
+              
               <Clock />
               <Button size="sm" variant="outline" onClick={() => setLang(lang === "fa" ? "en" : "fa")}>
                 {t.lang}

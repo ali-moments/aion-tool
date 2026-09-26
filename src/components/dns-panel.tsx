@@ -3,8 +3,8 @@ import { toast } from "sonner";
 import { Check, Copy, ChevronLeft, ChevronRight } from "lucide-react";
 import { DNS_PROVIDERS, type DnsTag } from "@/lib/dns-providers";
 import { STR } from "@/lib/i18n";
-import { isIpv4, setDnsSteps } from "@/lib/protocols";
-import { runProtocol } from "@/lib/runner";
+import { isIpv4, setDnsSteps, setDnsOptimizedSteps } from "@/lib/protocols";
+import { runProtocol, runProtocolFast } from "@/lib/runner";
 import { useApp } from "@/lib/store";
 import { copyText, cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +30,9 @@ export function DnsPanel() {
   const iface = useApp((s) => s.iface);
   const dns = useApp((s) => s.dns);
   const busy = useApp((s) => s.busy);
+  const dnsMode = useApp((s) => s.dnsMode);
   const setDns = useApp((s) => s.setDns);
+  const setDnsMode = useApp((s) => s.setDnsMode);
   const t = STR[lang];
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
   const [primary, setPrimary] = useState("");
@@ -59,8 +61,17 @@ export function DnsPanel() {
 
   async function inject(name: string, a: string, b: string, providerId?: string) {
     setInjectingId(providerId || "custom");
-    const ok = await runProtocol(
-      setDnsSteps(iface, a, b),
+    
+    // Choose the appropriate DNS steps based on mode
+    const steps = dnsMode === "fast" 
+      ? setDnsSteps(iface, a, b)
+      : setDnsOptimizedSteps(iface, a, b);
+    
+    // Use fast execution for Fast Mode, regular for Optimize Mode
+    const runFunction = dnsMode === "fast" ? runProtocolFast : runProtocol;
+    
+    const ok = await runFunction(
+      steps,
       lang === "fa" ? `DNS اعمال شد: ${a}, ${b}` : `DNS injection complete: ${a}, ${b}`,
     );
     setInjectingId(null);
@@ -89,6 +100,44 @@ export function DnsPanel() {
 
   return (
     <div className="space-y-5">
+      {/* DNS Mode Selector */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h3 className="font-display text-lg tracking-wide">
+              {lang === "fa" ? "حالت DNS" : "DNS Mode"}
+            </h3>
+            <p className="mt-1 text-xs text-muted">{t.dnsModeHint}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setDnsMode("fast")}
+              className={cn(
+                "h-9 rounded-sm border px-4 text-sm font-medium transition-[border-color,background-color,color] duration-150",
+                dnsMode === "fast"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-elevated text-muted hover:text-fg",
+              )}
+            >
+              {t.dnsModeFast}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDnsMode("optimize")}
+              className={cn(
+                "h-9 rounded-sm border px-4 text-sm font-medium transition-[border-color,background-color,color] duration-150",
+                dnsMode === "optimize"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-elevated text-muted hover:text-fg",
+              )}
+            >
+              {t.dnsModeOptimize}
+            </button>
+          </div>
+        </div>
+      </Card>
+
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <button
@@ -126,7 +175,6 @@ export function DnsPanel() {
                       <p className="mt-1 text-xs text-muted">{lang === "fa" ? p.blurbFa : p.blurb}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      {p.original ? <Badge>{t.original}</Badge> : null}
                       {active ? <Badge variant="default">{t.applied}</Badge> : null}
                     </div>
                   </div>

@@ -20,6 +20,11 @@ export interface NetworkInterfacesResult {
   error?: string;
 }
 
+export interface LogResult {
+  success: boolean;
+  error?: string;
+}
+
 export interface ElectronAPI {
   platform: string;
   versions: {
@@ -28,7 +33,10 @@ export interface ElectronAPI {
     electron: string;
   };
   executeCommand: (command: string) => Promise<CommandResult>;
+  executeBatchCommands: (commands: string[]) => Promise<CommandResult>;
   getNetworkInterfaces: () => Promise<NetworkInterfacesResult>;
+  writeLogs: (logEntries: string[]) => Promise<LogResult>;
+  getLogPath: () => Promise<string>;
 }
 
 declare global {

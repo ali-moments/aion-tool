@@ -85,8 +85,15 @@ export function OpsPanel() {
   }
 
   async function flush() {
-    const ok = await runProtocol(flushOnlySteps(), "ipconfig /flushdns");
-    if (ok) toast.success(t.opsFlush);
+    // Flash DNS should reset DNS to DHCP and clear cache
+    const ok = await runProtocol(
+      resetDnsSteps(iface),
+      lang === "fa" ? "DNS پاک شد و به DHCP بازگشت." : "DNS cleared and reset to DHCP."
+    );
+    if (ok) {
+      setDns({ source: "dhcp" }); // Update UI state to reflect DNS reset
+      toast.success(t.opsFlush);
+    }
   }
 
   async function toggle(enable: boolean) {

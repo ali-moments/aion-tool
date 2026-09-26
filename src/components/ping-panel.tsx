@@ -7,22 +7,144 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { logger } from "@/lib/logger";
 
 type Row = { n: number; ms: number | null };
 
-async function probe(host: string, timeoutMs = 2500): Promise<number | null> {
-  const target = host.includes("://") ? host : `https://${host}`;
-  const start = performance.now();
-  const ctrl = new AbortController();
-  const timer = window.setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    await fetch(target, { mode: "no-cors", cache: "no-store", signal: ctrl.signal });
-    return Math.round(performance.now() - start);
-  } catch {
-    return null;
-  } finally {
-    window.clearTimeout(timer);
+interface PingResult {
+  success: boolean;
+  times: number[];
+  packetsLost: number;
+  avgTime: number;
+  error?: string;
+}
+
+async function executePing(host: string, count: number): Promise<PingResult> {
+  logger.info('PING', `Starting ping test to ${host} with ${count} packets`);
+  
+  // Use actual system ping command through Electron IPC
+  if (typeof window !== "undefined" && window.electronAPI?.executeCommand) {
+    try {
+      const command = `ping ${host} -n ${count}`;
+      logger.debug('PING', `Executing ping command: ${command}`);
+      const result = await window.electronAPI.executeCommand(command);
+      
+      if (!result.success || !result.output) {
+        logger.error('PING', 'Ping command failed', { 
+          host, 
+          count, 
+          error: result.error 
+        });
+        return {
+          success: false,
+          times: [],
+          packetsLost: count,
+          avgTime: 0,
+          error: result.error || "Ping command failed"
+        };
+      }
+
+      // Parse Windows ping output
+      const output = result.output;
+      const times: number[] = [];
+      let packetsLost = 0;
+
+      logger.debug('PING', 'Parsing ping output', { outputLength: output.length });
+
+      // Extract ping times using regex
+      const timeRegex = /time[<=](\d+)ms/gi;
+      let match;
+      while ((match = timeRegex.exec(output)) !== null) {
+        times.push(parseInt(match[1], 10));
+      }
+
+      // Extract packet loss from statistics
+      const lossMatch = output.match(/\((\d+)% loss\)/i);
+      if (lossMatch) {
+        const lossPercent = parseInt(lossMatch[1], 10);
+        packetsLost = Math.round((count * lossPercent) / 100);
+      } else {
+        // If no explicit loss info, calculate from successful responses
+        packetsLost = count - times.length;
+      }
+
+      const avgTime = times.length > 0 
+        ? Math.round(times.reduce((sum, time) => sum + time, 0) / times.length)
+        : 0;
+
+      logger.info('PING', 'Ping test completed successfully', {
+        host,
+        totalPackets: count,
+        successfulPackets: times.length,
+        packetsLost,
+        avgTime,
+        minTime: Math.min(...times),
+        maxTime: Math.max(...times)
+      });
+
+      return {
+        success: true,
+        times,
+        packetsLost,
+        avgTime
+      };
+    } catch (error) {
+      logger.error('PING', 'Ping execution failed', { host, count, error });
+      return {
+        success: false,
+        times: [],
+        packetsLost: count,
+        avgTime: 0,
+        error: error instanceof Error ? error.message : "Unknown error"
+      };
+    }
   }
+
+  // Fallback to HTTP probe for web/development mode
+  logger.warn('PING', 'Electron API not available, using fallback HTTP probe');
+  return await fallbackHttpProbe(host, count);
+}
+
+async function fallbackHttpProbe(host: string, count: number): Promise<PingResult> {
+  logger.info('PING', `Starting HTTP probe fallback to ${host} with ${count} requests`);
+  const times: number[] = [];
+  const target = host.includes("://") ? host : `https://${host}`;
+
+  for (let i = 0; i < count; i++) {
+    const start = performance.now();
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => ctrl.abort(), 2500);
+    
+    try {
+      await fetch(target, { mode: "no-cors", cache: "no-store", signal: ctrl.signal });
+      times.push(Math.round(performance.now() - start));
+    } catch {
+      // Failed ping
+      logger.debug('PING', `HTTP probe ${i + 1} failed to ${target}`);
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  const packetsLost = count - times.length;
+  const avgTime = times.length > 0 
+    ? Math.round(times.reduce((sum, time) => sum + time, 0) / times.length)
+    : 0;
+
+  logger.info('PING', 'HTTP probe fallback completed', {
+    host,
+    totalRequests: count,
+    successfulRequests: times.length,
+    requestsLost: packetsLost,
+    avgTime
+  });
+
+  return {
+    success: true,
+    times,
+    packetsLost,
+    avgTime
+  };
 }
 
 export function PingPanel() {
@@ -60,19 +182,52 @@ export function PingPanel() {
       "info",
     );
     log(`ping ${host} -n ${finalCount}`, "cmd");
-    const next: Row[] = [];
-    for (let i = 1; i <= finalCount; i++) {
-      const ms = await probe(host);
-      const row = { n: i, ms };
-      next.push(row);
-      setRows([...next]);
+    
+    try {
+      const result = await executePing(host, finalCount);
+      
+      if (!result.success && result.error) {
+        log(result.error, "err");
+        toast.error(lang === "fa" ? "خطا در پینگ" : "Ping failed");
+        setBusy(false);
+        return;
+      }
+
+      // Display results in real-time style for better UX
+      const newRows: Row[] = [];
+      
+      // Add successful pings
+      for (let i = 0; i < result.times.length; i++) {
+        newRows.push({ n: i + 1, ms: result.times[i] });
+        setRows([...newRows]);
+        log(
+          `#${i + 1} time=${result.times[i]}ms TTL=64`,
+          "ok",
+        );
+      }
+      
+      // Add failed pings
+      for (let i = result.times.length; i < finalCount; i++) {
+        newRows.push({ n: i + 1, ms: null });
+        setRows([...newRows]);
+        log(`#${i + 1} ${t.probeFail}`, "err");
+      }
+
+      // Log summary
+      const recv = result.times.length;
+      const loss = Math.round(((finalCount - recv) / finalCount) * 100);
       log(
-        ms == null
-          ? `#${i} ${t.probeFail}`
-          : `#${i} time=${ms}ms TTL=preview`,
-        ms == null ? "err" : "ok",
+        lang === "fa" 
+          ? `خلاصه: ${recv}/${finalCount} دریافت شد، ${loss}% از دست رفت، میانگین: ${result.avgTime}ms`
+          : `Summary: ${recv}/${finalCount} received, ${loss}% loss, avg: ${result.avgTime}ms`,
+        "info"
       );
+
+    } catch (error) {
+      log(lang === "fa" ? "خطا در اجرای پینگ" : "Ping execution error", "err");
+      console.error("Ping error:", error);
     }
+    
     setBusy(false);
     toast.success(t.done);
   }
@@ -81,7 +236,14 @@ export function PingPanel() {
     <div className="space-y-4">
       <Card className="p-4">
         <h2 className="font-display text-lg tracking-wide">{t.pingTitle}</h2>
-        <p className="mt-1 text-sm text-muted">{t.pingNote}</p>
+        <p className="mt-1 text-sm text-muted">
+          {t.pingNote}
+          {typeof window !== "undefined" && !window.electronAPI?.executeCommand && (
+            <span className="ml-2 text-warning">
+              {lang === "fa" ? "(حالت HTTP برای مرورگر)" : "(HTTP mode for browser)"}
+            </span>
+          )}
+        </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto]">
           <div className="space-y-1.5">
             <Label htmlFor="ping-host">{t.pingHost}</Label>

@@ -18,9 +18,30 @@ contextBridge.exposeInMainWorld("electronAPI", {
      * @returns {Promise<{success: boolean, output?: string, error?: string}>}
      */
     executeCommand: (command) => ipcRenderer.invoke("execute-command", command),
+    
+    /**
+     * Execute multiple commands in a batch for better performance
+     * @param {string[]} commands - Array of commands to execute
+     * @returns {Promise<{success: boolean, output?: string, error?: string}>}
+     */
+    executeBatchCommands: (commands) => ipcRenderer.invoke("execute-batch-commands", commands),
+    
     /**
      * Get list of network interfaces from the system
      * @returns {Promise<{success: boolean, adapters?: Array, error?: string}>}
      */
     getNetworkInterfaces: () => ipcRenderer.invoke("get-network-interfaces"),
+    
+    /**
+     * Write log entries to the log file
+     * @param {string[]} logEntries - Array of log entry strings to write
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    writeLogs: (logEntries) => ipcRenderer.invoke("write-logs", logEntries),
+    
+    /**
+     * Get the log file path
+     * @returns {Promise<string>} The full path to the log file
+     */
+    getLogPath: () => ipcRenderer.invoke("get-log-path"),
 });

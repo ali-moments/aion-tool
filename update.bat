@@ -2,4 +2,4 @@
 
 git pull
 pnpm build
-pnpm run electron:dev
+pnpm run electron:build

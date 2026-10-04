@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Power, RefreshCcw, RotateCcw, Trash2, Unplug, Sync } from "lucide-react";
+import { Power, RefreshCcw, RotateCcw, RotateCw, Trash2, Unplug } from "lucide-react";
 import { STR } from "@/lib/i18n";
 import {
   adapterResetSteps,
@@ -204,7 +204,7 @@ export function OpsPanel() {
 
   const actions = [
     {
-      icon: Sync,
+      icon: RotateCw,
       title: lang === "fa" ? "همگام‌سازی" : "Sync State",
       hint: lang === "fa" ? "همگام‌سازی با وضعیت واقعی سیستم" : "Synchronize with actual system state",
       onClick: syncState,

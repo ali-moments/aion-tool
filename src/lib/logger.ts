@@ -89,7 +89,7 @@ class Logger {
     }
 
     // Also log to console in development or when not in Electron
-    const isDevelopment = typeof import !== 'undefined' && import.meta.env?.DEV === true;
+    const isDevelopment = typeof window !== 'undefined' && import.meta.env?.DEV === true;
     if (isDevelopment || !this.isElectron) {
       const logFn = level === 'ERROR' ? console.error : 
                    level === 'WARN' ? console.warn : console.log;

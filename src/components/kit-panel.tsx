@@ -1,4 +1,3 @@
-import { toast } from "sonner";
 import { Download, FileCode2, Terminal } from "lucide-react";
 import { toast } from "sonner";
 import { providerById } from "@/lib/dns-providers";

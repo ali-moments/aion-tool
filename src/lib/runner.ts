@@ -73,19 +73,21 @@ export async function runProtocolFast(steps: ProtocolStep[], doneMessage?: strin
         if (doneMessage) {
           setLastOp(doneMessage);
         }
+        setBusy(false); // Success: clear busy state
         return true;
       } else {
         console.error("Fast DNS execution failed:", result.error);
         logger.error('RUNNER', 'Fast protocol execution failed, falling back to regular mode', { error: result.error });
         log(lang === "fa" ? "خطا در اعمال سریع، تلاش با روش عادی..." : "Fast mode failed, falling back...", "info");
-        // Fallback to regular execution
+        // Fallback to regular execution - don't reset busy here, let runProtocol handle it
       }
     } else {
       logger.warn('RUNNER', 'Batch commands API not available, falling back to regular mode');
     }
     
     // Fallback to regular execution if batch API not available or failed
-    setBusy(false); // Reset busy state for regular execution
+    // runProtocol expects to manage busy state itself, so we reset and let it take control
+    setBusy(false);
     return await runProtocol(steps, doneMessage);
     
   } catch (error) {
@@ -93,10 +95,9 @@ export async function runProtocolFast(steps: ProtocolStep[], doneMessage?: strin
     logger.error('RUNNER', 'Fast protocol execution encountered an error', { error });
     const errorMsg = lang === "fa" ? "خطا در اعمال سریع DNS." : "Fast DNS execution failed.";
     log(errorMsg, "err");
-    setBusy(false); // Reset busy state for fallback
-    return await runProtocol(steps, doneMessage);
-  } finally {
+    // Reset busy state and let runProtocol handle it
     setBusy(false);
+    return await runProtocol(steps, doneMessage);
   }
 }
 

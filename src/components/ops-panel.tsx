@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Power, RefreshCcw, RotateCcw, Trash2, Unplug } from "lucide-react";
+import { Power, RefreshCcw, RotateCcw, Trash2, Unplug, Sync } from "lucide-react";
 import { STR } from "@/lib/i18n";
 import {
   adapterResetSteps,
@@ -26,9 +26,11 @@ export function OpsPanel() {
   const iface = useApp((s) => s.iface);
   const adapters = useApp((s) => s.adapters);
   const busy = useApp((s) => s.busy);
+  const setBusy = useApp((s) => s.setBusy);
   const dns = useApp((s) => s.dns);
   const log = useApp((s) => s.log);
   const setDns = useApp((s) => s.setDns);
+  const syncWithSystem = useApp((s) => s.syncWithSystem);
   const setAdapterAdmin = useApp((s) => s.setAdapterAdmin);
   const t = STR[lang];
   const [confirm, setConfirm] = useState(false);
@@ -67,7 +69,19 @@ export function OpsPanel() {
     console.log("[OpsPanel] Reset completed, success:", ok);
     
     if (ok) {
+      // Show success with restart recommendation
       toast.success(t.opsReset);
+      
+      // Add important warning about potential restart requirement
+      setTimeout(() => {
+        toast.warning(
+          lang === "fa" 
+            ? "⚠️ توصیه: برای اطمینان از عملکرد کامل، سیستم را ریستارت کنید"
+            : "⚠️ Recommendation: Restart your system for complete functionality",
+          { duration: 8000 } // Show longer for important message
+        );
+      }, 2000);
+      
     } else {
       toast.error(lang === "fa" ? "ریست آداپتور ناموفق بود" : "Adapter reset failed");
     }
@@ -85,13 +99,12 @@ export function OpsPanel() {
   }
 
   async function flush() {
-    // Flash DNS should reset DNS to DHCP and clear cache
+    // Flush DNS cache only (without changing DNS settings)
     const ok = await runProtocol(
-      resetDnsSteps(iface),
-      lang === "fa" ? "DNS پاک شد و به DHCP بازگشت." : "DNS cleared and reset to DHCP."
+      flushOnlySteps(),
+      lang === "fa" ? "کش DNS پاک شد." : "DNS cache flushed."
     );
     if (ok) {
-      setDns({ source: "dhcp" }); // Update UI state to reflect DNS reset
       toast.success(t.opsFlush);
     }
   }
@@ -104,17 +117,99 @@ export function OpsPanel() {
     }
   }
 
-  function showCurrent() {
-    log(currentDnsCmd(iface), "cmd");
-    if (dns.source === "dhcp") {
-      log(lang === "fa" ? "منبع: DHCP" : "Source: DHCP", "info");
-    } else {
-      log(`${dns.primary ?? "—"} / ${dns.secondary ?? "—"}`, "ok");
+  async function showCurrent() {
+    if (busy) return;
+    
+    const cmd = currentDnsCmd(iface);
+    log(cmd, "cmd");
+    
+    // Check if we have IPC access to execute commands
+    if (!window.electronAPI?.executeCommand) {
+      // Fallback to cached state with warning
+      log(lang === "fa" ? "⚠️ نمایش حالت کش‌شده (IPC در دسترس نیست)" : "⚠️ Showing cached state (IPC unavailable)", "warn");
+      if (dns.source === "dhcp") {
+        log(lang === "fa" ? "منبع: DHCP" : "Source: DHCP", "info");
+      } else {
+        log(`${dns.primary ?? "—"} / ${dns.secondary ?? "—"}`, "ok");
+      }
+      toast.message(t.current);
+      return;
     }
-    toast.message(t.current);
+    
+    setBusy(true);
+    
+    try {
+      const result = await window.electronAPI.executeCommand(cmd);
+      
+      if (result.success && result.output) {
+        // Parse and display actual system DNS configuration
+        const lines = result.output.split(/\r?\n/).filter(line => line.trim());
+        if (lines.length === 0) {
+          log(lang === "fa" ? "خروجی خالی دریافت شد" : "Empty output received", "warn");
+        } else {
+          // Display each line of the actual DNS configuration
+          lines.forEach(line => {
+            const trimmed = line.trim();
+            if (trimmed) {
+              log(trimmed, "ok");
+            }
+          });
+        }
+        toast.success(t.current);
+      } else {
+        const errorMsg = result.error || "Failed to read DNS configuration";
+        log(errorMsg, "err");
+        toast.error(lang === "fa" ? "خواندن تنظیمات DNS ناموفق بود" : "Failed to read DNS configuration");
+        
+        // Show cached state as fallback
+        log(lang === "fa" ? "نمایش حالت کش‌شده:" : "Showing cached state:", "info");
+        if (dns.source === "dhcp") {
+          log(lang === "fa" ? "منبع: DHCP" : "Source: DHCP", "info");
+        } else {
+          log(`${dns.primary ?? "—"} / ${dns.secondary ?? "—"}`, "info");
+        }
+      }
+    } catch (error) {
+      console.error("Error executing DNS query:", error);
+      log(lang === "fa" ? "خطا در اجرای دستور DNS" : "Error executing DNS command", "err");
+      toast.error(lang === "fa" ? "خطا در خواندن DNS" : "Error reading DNS");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function syncState() {
+    if (busy) return;
+    
+    setBusy(true);
+    log(lang === "fa" ? "همگام‌سازی با وضعیت سیستم..." : "Synchronizing with system state...", "info");
+    
+    try {
+      const success = await syncWithSystem();
+      
+      if (success) {
+        log(lang === "fa" ? "همگام‌سازی موفق" : "Sync successful", "ok");
+        toast.success(lang === "fa" ? "وضعیت با سیستم همگام شد" : "State synchronized with system");
+      } else {
+        log(lang === "fa" ? "همگام‌سازی ناقص" : "Sync partially failed", "warn");
+        toast.warning(lang === "fa" ? "همگام‌سازی ناقص انجام شد" : "Sync completed with some issues");
+      }
+    } catch (error) {
+      log(lang === "fa" ? "خطا در همگام‌سازی" : "Sync error", "err");
+      toast.error(lang === "fa" ? "خطا در همگام‌سازی" : "Sync failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   const actions = [
+    {
+      icon: Sync,
+      title: lang === "fa" ? "همگام‌سازی" : "Sync State",
+      hint: lang === "fa" ? "همگام‌سازی با وضعیت واقعی سیستم" : "Synchronize with actual system state",
+      onClick: syncState,
+      variant: "outline" as const,
+    },
     {
       icon: RotateCcw,
       title: t.opsReset,

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_ADAPTERS } from "@/lib/dns-providers";
+import { verifyDnsConfiguration } from "@/lib/protocols";
 import type { Lang } from "@/lib/i18n";
 import { nowStamp } from "@/lib/utils";
 import { logger } from "@/lib/logger";
@@ -51,6 +52,8 @@ interface AppState {
   setAdapterAdmin: (name: string, admin: Adapter["admin"]) => void;
   addCustomAdapter: (name: string) => void;
   refreshAdapters: () => Promise<boolean>;
+  refreshDnsState: () => Promise<boolean>;
+  syncWithSystem: () => Promise<boolean>;
   log: (text: string, kind?: LogLine["kind"]) => void;
   clearLogs: () => void;
   setLastOp: (op: string) => void;
@@ -102,12 +105,29 @@ export const useApp = create<AppState>()(
         }),
       addCustomAdapter: (name) => {
         const trimmed = name.trim();
+        
+        // Basic validation
         if (!trimmed) return;
+        
+        // Length validation
+        if (trimmed.length > 100) {
+          logger.warn('STORE', 'Adapter name too long', { name: trimmed, length: trimmed.length });
+          return;
+        }
+        
+        // Character validation - allow alphanumeric, spaces, hyphens, underscores, parentheses
+        if (!/^[a-zA-Z0-9 \-_()]+$/.test(trimmed)) {
+          logger.warn('STORE', 'Invalid characters in adapter name', { name: trimmed });
+          return;
+        }
+        
         const exists = get().adapters.some((a) => a.name === trimmed);
         if (exists) {
           set({ iface: trimmed });
           return;
         }
+        
+        logger.info('STORE', 'Adding custom adapter', { name: trimmed });
         set({
           iface: trimmed,
           adapters: [
@@ -161,6 +181,78 @@ export const useApp = create<AppState>()(
           console.error("[Store] Error refreshing adapters:", error);
           return false;
         }
+      },
+      refreshDnsState: async () => {
+        const { iface, dns, setDns } = get();
+        
+        // Check if we can get system DNS state
+        if (typeof window === "undefined" || !window.electronAPI?.executeCommand) {
+          logger.warn('STORE', 'Cannot refresh DNS state - IPC not available');
+          return false;
+        }
+
+        try {
+          logger.debug('STORE', 'Refreshing DNS state from system');
+          
+          // Use the verification function to get actual DNS state
+          const verification = await verifyDnsConfiguration(iface);
+          
+          if (verification.success && verification.actualDns) {
+            const { primary, secondary } = verification.actualDns;
+            
+            // Check if we found any DNS servers
+            if (primary || secondary) {
+              // Update state with actual system DNS
+              const newDnsState: DnsState = {
+                source: "static",
+                primary: primary || undefined,
+                secondary: secondary || undefined,
+                // Try to preserve provider ID if it matches
+                providerId: dns.providerId
+              };
+              
+              setDns(newDnsState);
+              logger.info('STORE', 'DNS state synchronized with system', { 
+                oldState: dns,
+                newState: newDnsState 
+              });
+              return true;
+            } else {
+              // No static DNS found, assume DHCP
+              const newDnsState: DnsState = { source: "dhcp" };
+              setDns(newDnsState);
+              logger.info('STORE', 'DNS state synchronized to DHCP mode');
+              return true;
+            }
+          } else {
+            logger.warn('STORE', 'Failed to verify DNS configuration for sync', {
+              error: verification.error
+            });
+            return false;
+          }
+        } catch (error) {
+          logger.error('STORE', 'Error refreshing DNS state', { error });
+          return false;
+        }
+      },
+      syncWithSystem: async () => {
+        logger.info('STORE', 'Starting full system synchronization');
+        
+        const adapterResult = await get().refreshAdapters();
+        const dnsResult = await get().refreshDnsState();
+        
+        const success = adapterResult && dnsResult;
+        
+        if (success) {
+          logger.info('STORE', 'System synchronization completed successfully');
+        } else {
+          logger.warn('STORE', 'System synchronization partially failed', {
+            adapters: adapterResult,
+            dns: dnsResult
+          });
+        }
+        
+        return success;
       },
       log: (text, kind = "info") => {
         const id = get().logSeq + 1;

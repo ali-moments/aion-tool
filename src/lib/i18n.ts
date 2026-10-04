@@ -41,16 +41,22 @@ export const STR = {
     applyCustom: "اعمال سفارشی",
     invalidIp: "آی‌پی نامعتبر است",
     opsReset: "ریست آداپتور",
-    opsResetHint: "فلش کش، ریست IP، خاموش/روشن آداپتور، renew",
+    opsResetHint: "⚠️ خطرناک: ریست کامل TCP/IP - ممکن است ریستارت لازم باشد",
     opsDnsReset: "بازنشانی DNS",
     opsDnsResetHint: "برگشت به DHCP و ثبت دوباره DNS",
     opsFlush: "فلاش DNS",
-    opsFlushHint: "پاک کردن DNS و برگشت به DHCP",
+    opsFlushHint: "پاک کردن کش DNS بدون تغییر تنظیمات",
     opsDisable: "خاموش کردن آداپتور",
     opsEnable: "روشن کردن آداپتور",
-    confirmReset: "ریست کامل آداپتور؟",
+    confirmReset: "⚠️ هشدار: ریست کامل و خطرناک TCP/IP؟",
     confirmResetBody:
-      "همین ترتیب اسکریپت اصلی اجرا می‌شود: flush، ip reset، disable/enable، release/renew، registerdns.",
+      "این عملیات کامل ترین و خطرناک ترین ریست شبکه است:\n\n" +
+      "• پاک کردن کامل پیکربندی TCP/IP\n" +
+      "• حذف تمام تنظیمات شبکه پیشرفته\n" +
+      "• خاموش و روشن آداپتور\n" +
+      "• تمدید IP و ثبت دوباره DNS\n\n" +
+      "⚠️ هشدار مهم: پس از این عملیات ممکن است نیاز به ریستارت سیستم باشد.\n" +
+      "آیا مطمئن هستید که می‌خواهید ادامه دهید؟",
     cancel: "انصراف",
     confirm: "اجرا",
     pingTitle: "تست پینگ",
@@ -139,16 +145,22 @@ export const STR = {
     applyCustom: "Apply custom",
     invalidIp: "Invalid IP address",
     opsReset: "Reset Adapter",
-    opsResetHint: "Flush cache, IP reset, disable/enable, renew — original order",
+    opsResetHint: "⚠️ Dangerous: Full TCP/IP reset - may require system restart",
     opsDnsReset: "Reset DNS",
     opsDnsResetHint: "Restore DHCP and re-register DNS",
     opsFlush: "Flash DNS",
-    opsFlushHint: "Clear DNS configuration and reset to DHCP",
+    opsFlushHint: "Clear DNS cache without changing settings",
     opsDisable: "Disable adapter",
     opsEnable: "Enable adapter",
-    confirmReset: "Run full adapter reset?",
+    confirmReset: "⚠️ Warning: Dangerous Full TCP/IP Reset?",
     confirmResetBody:
-      "Same sequence as the original script: flush, ip reset, disable/enable, release/renew, registerdns.",
+      "This is the most complete and dangerous network reset operation:\n\n" +
+      "• Complete TCP/IP configuration wipe\n" +
+      "• Removes ALL advanced network settings\n" +
+      "• Disables and re-enables network adapter\n" +
+      "• IP renewal and DNS re-registration\n\n" +
+      "⚠️ Important Warning: This operation may require a system restart.\n" +
+      "Are you sure you want to continue?",
     cancel: "Cancel",
     confirm: "Execute",
     pingTitle: "Ping test",

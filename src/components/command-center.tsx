@@ -59,6 +59,7 @@ export function CommandCenter() {
   const setView = useApp((s) => s.setView);
   const setIface = useApp((s) => s.setIface);
   const refreshAdapters = useApp((s) => s.refreshAdapters);
+  const syncWithSystem = useApp((s) => s.syncWithSystem);
   const t = STR[lang];
   const provider = providerById(dns.providerId);
 
@@ -68,6 +69,23 @@ export function CommandCenter() {
     if (useApp.persist.hasHydrated()) finish();
     return unsub;
   }, []);
+
+  // Auto-sync with system state after boot is complete
+  useEffect(() => {
+    if (hydrated && bootDone) {
+      // Small delay to ensure everything is loaded
+      const timeoutId = setTimeout(async () => {
+        try {
+          await syncWithSystem();
+          console.log("[CommandCenter] Initial system sync completed");
+        } catch (error) {
+          console.warn("[CommandCenter] Initial system sync failed:", error);
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [hydrated, bootDone, syncWithSystem]);
 
   // Refresh network interfaces on mount (after boot screen)
   useEffect(() => {
@@ -285,7 +303,6 @@ export function CommandCenter() {
             ))}
           </div>
         </nav>
-        <Toaster theme="dark" position="top-center" />
       </div>
     </TooltipProvider>
   );

@@ -10,6 +10,7 @@ const execAsync = promisify(exec);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow = null;
+let isQuitting = false; // Track quit state for proper cleanup
 
 // IPC Handlers for command execution and network interface detection
 
@@ -36,8 +37,9 @@ ipcMain.handle("execute-batch-commands", async (event, commands) => {
     try {
         console.log(`[IPC] Executing batch of ${commands.length} commands`);
         
-        // Create a PowerShell script that executes all commands
-        const script = commands.join(' && ');
+        // Create a PowerShell script that executes all commands sequentially
+        // Use ; instead of && so all commands run regardless of individual failures
+        const script = commands.join('; ');
         
         const { stdout, stderr } = await execAsync(script, {
             windowsHide: true,
@@ -180,33 +182,63 @@ ipcMain.handle("get-network-interfaces", async (event) => {
             timeout: 10000,
         });
 
-        // Parse Windows netsh output
+        // Parse Windows netsh output with PowerShell JSON for reliability
         if (process.platform === "win32") {
-            const lines = stdout.split("\n").slice(3); // Skip header lines
-            const adapters = [];
+            try {
+                // Use PowerShell to get structured JSON output instead of parsing text
+                const psCommand = `powershell -Command "Get-NetAdapter | Select-Object Name, InterfaceOperationalStatus, AdminStatus | ConvertTo-Json"`;
+                
+                const { stdout: psOutput } = await execAsync(psCommand, {
+                    windowsHide: true,
+                    timeout: 10000,
+                });
 
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed) continue;
+                // Parse JSON output from PowerShell
+                const rawData = JSON.parse(psOutput);
+                // Handle both single adapter (object) and multiple adapters (array)
+                const adapters = Array.isArray(rawData) ? rawData : [rawData];
+                
+                const processedAdapters = adapters
+                    .filter(adapter => adapter && adapter.Name) // Filter out invalid entries
+                    .map(adapter => ({
+                        name: adapter.Name,
+                        admin: adapter.AdminStatus === "Up" ? "Enabled" : "Disabled", 
+                        state: adapter.InterfaceOperationalStatus === "Up" ? "Connected" : "Disconnected",
+                    }));
 
-                // Parse format: Admin State    State          Type             Interface Name
-                const parts = trimmed.split(/\s{2,}/); // Split by 2+ spaces
-                if (parts.length >= 4) {
-                    const [adminState, state, type, ...nameParts] = parts;
-                    const name = nameParts.join(" ").trim();
+                console.log(`[IPC] Found ${processedAdapters.length} network interfaces via PowerShell`);
+                return { success: true, adapters: processedAdapters };
+                
+            } catch (psError) {
+                console.warn("[IPC] PowerShell method failed, falling back to netsh:", psError.message);
+                
+                // Fallback to original netsh parsing if PowerShell fails
+                const lines = stdout.split("\n").slice(3); // Skip header lines
+                const adapters = [];
 
-                    if (name) {
-                        adapters.push({
-                            name,
-                            admin: adminState.includes("Enabled") ? "Enabled" : "Disabled",
-                            state: state.includes("Connected") ? "Connected" : "Disconnected",
-                        });
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed) continue;
+
+                    // Parse format: Admin State    State          Type             Interface Name
+                    const parts = trimmed.split(/\s{2,}/); // Split by 2+ spaces
+                    if (parts.length >= 4) {
+                        const [adminState, state, type, ...nameParts] = parts;
+                        const name = nameParts.join(" ").trim();
+
+                        if (name) {
+                            adapters.push({
+                                name,
+                                admin: adminState.includes("Enabled") ? "Enabled" : "Disabled",
+                                state: state.includes("Connected") ? "Connected" : "Disconnected",
+                            });
+                        }
                     }
                 }
-            }
 
-            console.log(`[IPC] Found ${adapters.length} network interfaces`);
-            return { success: true, adapters };
+                console.log(`[IPC] Found ${adapters.length} network interfaces via fallback netsh`);
+                return { success: true, adapters };
+            }
         } else {
             // Basic parsing for Linux/Mac (simplified)
             const lines = stdout.split("\n");
@@ -266,8 +298,31 @@ async function createWindow(serverUrl) {
         mainWindow = null;
     });
 
-    // Wait a bit for server to be fully ready
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Check if server is ready with retry logic
+    const maxRetries = 10;
+    const retryDelay = 200; // 200ms between attempts
+    let serverReady = false;
+    
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const response = await fetch(serverUrl);
+            if (response.ok || response.status === 200) {
+                serverReady = true;
+                console.log(`Server ready after ${i + 1} attempts`);
+                break;
+            }
+        } catch (error) {
+            // Server not ready yet, continue retrying
+        }
+        
+        if (i < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+    }
+    
+    if (!serverReady) {
+        console.warn("Server not ready after maximum retries, attempting to load anyway...");
+    }
 
     try {
         console.log(`Loading application from ${serverUrl}...`);
@@ -339,7 +394,15 @@ app.on("window-all-closed", async () => {
 });
 
 app.on("before-quit", async (event) => {
-    event.preventDefault();
-    await stopServer();
-    app.exit(0);
+    // Prevent quit while we cleanup, but only once
+    if (!isQuitting) {
+        event.preventDefault();
+        isQuitting = true;
+        
+        console.log("Application shutting down, stopping server...");
+        await stopServer();
+        
+        // Now allow the app to quit naturally
+        app.quit();
+    }
 });

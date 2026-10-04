@@ -89,7 +89,8 @@ class Logger {
     }
 
     // Also log to console in development or when not in Electron
-    if (process.env.NODE_ENV === 'development' || !this.isElectron) {
+    const isDevelopment = typeof import !== 'undefined' && import.meta.env?.DEV === true;
+    if (isDevelopment || !this.isElectron) {
       const logFn = level === 'ERROR' ? console.error : 
                    level === 'WARN' ? console.warn : console.log;
       logFn(`[${category}] ${message}`, data || '');

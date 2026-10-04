@@ -1,5 +1,6 @@
 import { toast } from "sonner";
 import { Download, FileCode2, Terminal } from "lucide-react";
+import { toast } from "sonner";
 import { providerById } from "@/lib/dns-providers";
 import { STR } from "@/lib/i18n";
 import { applyScript, currentDnsCmd } from "@/lib/protocols";
@@ -15,11 +16,10 @@ const FILES: Array<{
   labelKey?: keyof typeof STR.fa;
   primary?: boolean;
 }> = [
-  { href: "/AION-TOOL-Windows.zip", labelKey: "kitDownload", icon: Download, primary: true },
-  { href: "/windows/AION-TOOL.exe", label: "AION-TOOL.exe", icon: Download, primary: true },
-  { href: "/windows/AION-TOOL.bat", labelKey: "downloadBat", icon: Terminal },
-  { href: "/windows/AION-TOOL.ps1", labelKey: "downloadPs1", icon: FileCode2 },
-  { href: "/windows/AION-TOOL.py", labelKey: "downloadPy", icon: FileCode2 },
+  { href: "/AIOT00L-Windows.zip", labelKey: "kitDownload", icon: Download, primary: true },
+  { href: "/windows/AIOT00L.bat", labelKey: "downloadBat", icon: Terminal },
+  { href: "/windows/AIOT00L.ps1", labelKey: "downloadPs1", icon: FileCode2 },
+  { href: "/windows/AIOT00L.py", labelKey: "downloadPy", icon: FileCode2 },
 ];
 
 export function KitPanel() {

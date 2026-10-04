@@ -1,5 +1,5 @@
 import { createServer } from "http";
-import { join, dirname } from "path";
+import { join, dirname, normalize, resolve, sep } from "path";
 import { fileURLToPath } from "url";
 import { app } from "electron";
 import { existsSync, readFileSync } from "fs";
@@ -12,6 +12,34 @@ const SERVER_URL = `http://localhost:${SERVER_PORT}`;
 
 let httpServer = null;
 let nitroHandler = null;
+
+/**
+ * Safely join a base directory with a requested path, preventing directory traversal attacks
+ * @param {string} base - The base directory path
+ * @param {string} requested - The requested file path from URL
+ * @returns {string|null} - Safe file path or null if traversal attempt detected
+ */
+function safeJoin(base, requested) {
+    try {
+        // Decode URL encoding and remove query parameters
+        const decoded = decodeURIComponent(requested.split('?')[0]);
+        
+        // Normalize and resolve the path, ensuring it stays within the base directory
+        const resolved = resolve(base, '.' + normalize('/' + decoded));
+        
+        // Check if the resolved path is still within the base directory
+        const basePath = resolve(base);
+        if (!resolved.startsWith(basePath + sep) && resolved !== basePath) {
+            console.warn(`[Security] Path traversal attempt blocked: ${requested} -> ${resolved}`);
+            return null;
+        }
+        
+        return resolved;
+    } catch (error) {
+        console.error(`[Security] Error processing path: ${requested}`, error);
+        return null;
+    }
+}
 
 // Find the Nitro server entry point
 function findNitroServer(appRoot) {
@@ -104,8 +132,8 @@ export async function startServer() {
             try {
                 // Check if this is a static asset request
                 if (staticDir && req.url.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|webp|json)$/)) {
-                    const filePath = join(staticDir, req.url);
-                    if (existsSync(filePath)) {
+                    const filePath = safeJoin(staticDir, req.url);
+                    if (filePath && existsSync(filePath)) {
                         const content = readFileSync(filePath);
                         const ext = req.url.split('.').pop();
                         const contentTypes = {
@@ -123,8 +151,22 @@ export async function startServer() {
                             'webp': 'image/webp',
                             'json': 'application/json'
                         };
-                        res.writeHead(200, { 'Content-Type': contentTypes[ext] || 'application/octet-stream' });
+                        
+                        // Add security headers
+                        const headers = {
+                            'Content-Type': contentTypes[ext] || 'application/octet-stream',
+                            'X-Content-Type-Options': 'nosniff',
+                            'X-Frame-Options': 'DENY',
+                            'X-XSS-Protection': '1; mode=block'
+                        };
+                        
+                        res.writeHead(200, headers);
                         res.end(content);
+                        return;
+                    } else if (!filePath) {
+                        // Path traversal attempt blocked
+                        res.writeHead(403, { 'Content-Type': 'text/plain' });
+                        res.end('Forbidden: Invalid path');
                         return;
                     }
                 }

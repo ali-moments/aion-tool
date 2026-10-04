@@ -21,9 +21,9 @@
     "test": "node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "electron:dev": "npm run build && electron .",
-    "electron:build": "npm run build && electron-builder --win",
-    "electron:build:all": "npm run build && electron-builder -mwl"
+    "electron:dev": "pnpm build && electron .",
+    "electron:build": "pnpm build && electron-builder --win",
+    "electron:build:all": "pnpm build && electron-builder -mwl"
   },
   "build": {
     "appId": "com.theyoqaizo.aion-tool",

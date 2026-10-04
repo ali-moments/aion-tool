@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { STR } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
 import { formatMs } from "@/lib/utils";
+import { sanitizeHost } from "@/lib/protocols";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,10 +23,23 @@ interface PingResult {
 async function executePing(host: string, count: number): Promise<PingResult> {
   logger.info('PING', `Starting ping test to ${host} with ${count} packets`);
   
+  // Sanitize host input to prevent command injection
+  const safeHost = sanitizeHost(host);
+  if (!safeHost) {
+    logger.error('PING', 'Invalid host provided', { originalHost: host });
+    return {
+      success: false,
+      times: [],
+      packetsLost: count,
+      avgTime: 0,
+      error: "Invalid host format"
+    };
+  }
+  
   // Use actual system ping command through Electron IPC
   if (typeof window !== "undefined" && window.electronAPI?.executeCommand) {
     try {
-      const command = `ping ${host} -n ${count}`;
+      const command = `ping ${safeHost} -n ${count}`;
       logger.debug('PING', `Executing ping command: ${command}`);
       const result = await window.electronAPI.executeCommand(command);
       
@@ -173,6 +187,14 @@ export function PingPanel() {
       toast.error(lang === "fa" ? "تعداد باید بین ۱ تا ۱۰۰ باشد" : "Count must be between 1 and 100");
       return;
     }
+    
+    // Sanitize host input
+    const safeHost = sanitizeHost(host);
+    if (!safeHost) {
+      toast.error(lang === "fa" ? "آدرس نامعتبر است" : "Invalid host address");
+      return;
+    }
+    
     setBusy(true);
     setRows([]);
     log(
@@ -181,10 +203,10 @@ export function PingPanel() {
         : `Initiating ping test to ${host} × ${finalCount}...`,
       "info",
     );
-    log(`ping ${host} -n ${finalCount}`, "cmd");
+    log(`ping ${safeHost} -n ${finalCount}`, "cmd");
     
     try {
-      const result = await executePing(host, finalCount);
+      const result = await executePing(safeHost, finalCount);
       
       if (!result.success && result.error) {
         log(result.error, "err");

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { STR } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -15,7 +16,7 @@ export function ConsolePanel() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [logs.length]);
+  }, [logs]); // Use logs array instead of just length for more reliable scrolling
 
   return (
     <Card className="flex h-full min-h-64 flex-col overflow-hidden">

@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Check, Copy, ChevronLeft, ChevronRight } from "lucide-react";
 import { DNS_PROVIDERS, type DnsTag } from "@/lib/dns-providers";
 import { STR } from "@/lib/i18n";
-import { isIpv4, setDnsSteps, setDnsOptimizedSteps } from "@/lib/protocols";
+import { isIpv4, setDnsSteps, setDnsOptimizedSteps, verifyDnsConfiguration } from "@/lib/protocols";
 import { runProtocol, runProtocolFast } from "@/lib/runner";
 import { useApp } from "@/lib/store";
 import { copyText, cn } from "@/lib/utils";
@@ -46,7 +46,7 @@ export function DnsPanel() {
   );
 
   // Reset to page 1 when filter changes
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [filter]);
 
@@ -75,9 +75,43 @@ export function DnsPanel() {
       lang === "fa" ? `DNS اعمال شد: ${a}, ${b}` : `DNS injection complete: ${a}, ${b}`,
     );
     setInjectingId(null);
+    
     if (ok) {
-      setDns({ source: "static", primary: a, secondary: b, providerId });
-      toast.success(lang === "fa" ? `${name} روی ${iface}` : `${name} on ${iface}`);
+      // Verify the DNS configuration was actually applied correctly
+      log(lang === "fa" ? "تأیید تنظیمات DNS..." : "Verifying DNS configuration...", "info");
+      
+      const verification = await verifyDnsConfiguration(iface, a, b);
+      
+      if (verification.success) {
+        // DNS was set correctly
+        setDns({ source: "static", primary: a, secondary: b, providerId });
+        toast.success(lang === "fa" ? `${name} روی ${iface}` : `${name} on ${iface}`);
+      } else {
+        // DNS configuration incomplete or incorrect
+        log(
+          lang === "fa" 
+            ? `⚠️ هشدار: تنظیمات DNS ممکن است ناقص باشد - ${verification.error || 'تأیید نشد'}` 
+            : `⚠️ Warning: DNS configuration may be incomplete - ${verification.error || 'verification failed'}`, 
+          "warn"
+        );
+        
+        if (verification.actualDns) {
+          log(
+            lang === "fa"
+              ? `DNS واقعی: ${verification.actualDns.primary || '—'} / ${verification.actualDns.secondary || '—'}`
+              : `Actual DNS: ${verification.actualDns.primary || '—'} / ${verification.actualDns.secondary || '—'}`,
+            "info"
+          );
+        }
+        
+        // Still update the state with what we attempted to set, but show warning
+        setDns({ source: "static", primary: a, secondary: b, providerId });
+        toast.warning(
+          lang === "fa" 
+            ? `${name} اعمال شد اما ممکن است ناقص باشد` 
+            : `${name} applied but may be incomplete`
+        );
+      }
     }
   }
 

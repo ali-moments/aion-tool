@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-export function ConsolePanel() {
+export function ConsolePanel({ isVisible = true }: { isVisible?: boolean }) {
   const lang = useApp((s) => s.lang);
   const logs = useApp((s) => s.logs);
   const clearLogs = useApp((s) => s.clearLogs);
@@ -17,6 +17,10 @@ export function ConsolePanel() {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [logs]); // Use logs array instead of just length for more reliable scrolling
 
+  if (!isVisible) {
+    return null;
+  }
+
   return (
     <Card className="flex h-full min-h-64 flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
@@ -25,7 +29,7 @@ export function ConsolePanel() {
           {t.clearLog}
         </Button>
       </div>
-      <ScrollArea className="h-72">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="space-y-1 p-3 font-mono text-xs leading-relaxed">
           {logs.length === 0 ? (
             <p className="text-muted">{t.emptyLog}</p>

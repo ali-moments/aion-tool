@@ -11,6 +11,26 @@ import { Progress } from "@/components/ui/progress";
 type Result = { id: string; ms: number | null };
 
 async function probeIp(ip: string): Promise<number | null> {
+  // Use real ping if available in Electron app
+  if (typeof window !== "undefined" && window.electronAPI?.executeCommand) {
+    try {
+      const command = `ping ${ip} -n 1 -w 2000`; // Single ping with 2 second timeout
+      const result = await window.electronAPI.executeCommand(command);
+      
+      if (result.success && result.output) {
+        // Parse ping time from output
+        const timeMatch = result.output.match(/time[<=](\d+)ms/i);
+        if (timeMatch) {
+          return parseInt(timeMatch[1], 10);
+        }
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+  
+  // Fallback to HTTP probe for browser/development mode
   const start = performance.now();
   const ctrl = new AbortController();
   const timer = window.setTimeout(() => ctrl.abort(), 2200);

@@ -42,6 +42,7 @@ interface AppState {
   lastOp: string;
   logs: LogLine[];
   logSeq: number;
+  consoleVisible: boolean;
   setLang: (lang: Lang) => void;
   setView: (view: ViewId) => void;
   setDnsMode: (mode: DnsMode) => void;
@@ -57,6 +58,7 @@ interface AppState {
   log: (text: string, kind?: LogLine["kind"]) => void;
   clearLogs: () => void;
   setLastOp: (op: string) => void;
+  toggleConsole: () => void;
 }
 
 export const useApp = create<AppState>()(
@@ -73,6 +75,7 @@ export const useApp = create<AppState>()(
       lastOp: "",
       logs: [],
       logSeq: 0,
+      consoleVisible: true,
       setLang: (lang) => set({ lang }),
       setView: (view) => {
         logger.info('STORE', `View changed to: ${view}`);
@@ -153,12 +156,32 @@ export const useApp = create<AppState>()(
             const newAdapters = result.adapters;
             
             // Check if current interface still exists
-            const ifaceExists = newAdapters.some((a) => a.name === currentIface);
+            const currentAdapter = newAdapters.find((a) => a.name === currentIface);
+            const ifaceExists = !!currentAdapter;
             
-            // If current interface doesn't exist, select the first connected adapter
-            const newIface = ifaceExists 
-              ? currentIface 
-              : (newAdapters.find((a) => a.state === "Connected")?.name || newAdapters[0]?.name || "Ethernet");
+            let newIface = currentIface;
+            
+            // Only change interface if current one is completely missing (not just disconnected)
+            // This prevents automatic switching when adapters temporarily disconnect
+            if (!ifaceExists) {
+              logger.warn('STORE', `Current interface '${currentIface}' no longer exists, selecting alternative`);
+              
+              // Try to find a connected adapter, fallback to first available, then default
+              const connectedAdapter = newAdapters.find((a) => a.state === "Connected");
+              const enabledAdapter = newAdapters.find((a) => a.admin === "Enabled");
+              
+              newIface = connectedAdapter?.name || enabledAdapter?.name || newAdapters[0]?.name || "Ethernet";
+              
+              logger.info('STORE', `Interface switched from '${currentIface}' to '${newIface}'`);
+            } else {
+              // Log status changes for existing interface without switching
+              if (currentAdapter.admin === "Disabled") {
+                logger.info('STORE', `Current interface '${currentIface}' is disabled`);
+              }
+              if (currentAdapter.state === "Disconnected") {
+                logger.info('STORE', `Current interface '${currentIface}' is disconnected`);
+              }
+            }
             
             set({
               adapters: newAdapters,
@@ -167,7 +190,8 @@ export const useApp = create<AppState>()(
             
             logger.info('STORE', `Refreshed ${newAdapters.length} network interfaces`, { 
               count: newAdapters.length, 
-              selectedInterface: newIface 
+              selectedInterface: newIface,
+              interfaceChanged: newIface !== currentIface
             });
             console.log(`[Store] Refreshed ${newAdapters.length} network interfaces`);
             return true;
@@ -261,6 +285,7 @@ export const useApp = create<AppState>()(
         set({ logSeq: id, logs });
       },
       clearLogs: () => set({ logs: [] }),
+      toggleConsole: () => set((state) => ({ consoleVisible: !state.consoleVisible })),
     }),
     {
       name: "aion-tool-v1",
@@ -271,6 +296,7 @@ export const useApp = create<AppState>()(
         adapters: s.adapters,
         dns: s.dns,
         bootDone: s.bootDone,
+        consoleVisible: s.consoleVisible,
       }),
     },
   ),

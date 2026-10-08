@@ -27,6 +27,35 @@ contextBridge.exposeInMainWorld("electronAPI", {
     executeBatchCommands: (commands) => ipcRenderer.invoke("execute-batch-commands", commands),
     
     /**
+     * Execute a command with streaming output (for real-time feedback)
+     * @param {string} command - The command to execute
+     * @param {function} onData - Callback function to handle streaming data
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    executeStreamCommand: (command, onData) => {
+        const channelId = `stream-${Date.now()}-${Math.random()}`;
+        
+        // Set up the data listener
+        const handleStreamData = (event, data) => {
+            if (data.channelId === channelId) {
+                onData({
+                    data: data.data,
+                    isComplete: data.isComplete
+                });
+                
+                // Clean up listener when complete
+                if (data.isComplete) {
+                    ipcRenderer.removeListener("stream-data", handleStreamData);
+                }
+            }
+        };
+        
+        ipcRenderer.on("stream-data", handleStreamData);
+        
+        return ipcRenderer.invoke("execute-stream-command", { command, channelId });
+    },
+    
+    /**
      * Get list of network interfaces from the system
      * @returns {Promise<{success: boolean, adapters?: Array, error?: string}>}
      */

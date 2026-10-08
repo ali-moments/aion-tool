@@ -113,6 +113,119 @@ ipcMain.handle("execute-command", async (event, command) => {
 });
 
 /**
+ * Execute a command with streaming output for real-time feedback
+ * @param {object} params - Object containing command and channelId
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+ipcMain.handle("execute-stream-command", async (event, { command, channelId }) => {
+    const { spawn } = await import("child_process");
+    
+    // Security: Validate command is from allowed list
+    const allowedPrefixes = ['ping'];
+    const cmdLower = command.trim().toLowerCase();
+
+    if (!allowedPrefixes.some(prefix => cmdLower.startsWith(prefix))) {
+        console.error(`[IPC] Blocked unauthorized streaming command: ${command}`);
+        return {
+            success: false,
+            error: "Streaming command not permitted for security reasons"
+        };
+    }
+
+    try {
+        console.log(`[IPC] Executing streaming command: ${command}`);
+        
+        // Parse command into program and arguments
+        const parts = command.trim().split(/\s+/);
+        const program = parts[0];
+        const args = parts.slice(1);
+        
+        return new Promise((resolve) => {
+            const child = spawn(program, args, {
+                windowsHide: true,
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+            
+            let hasStarted = false;
+            
+            // Handle stdout data
+            child.stdout.on('data', (data) => {
+                hasStarted = true;
+                const text = data.toString();
+                event.sender.send('stream-data', {
+                    channelId,
+                    data: text,
+                    isComplete: false
+                });
+            });
+            
+            // Handle stderr data 
+            child.stderr.on('data', (data) => {
+                hasStarted = true;
+                const text = data.toString();
+                event.sender.send('stream-data', {
+                    channelId,
+                    data: text,
+                    isComplete: false
+                });
+            });
+            
+            // Handle process completion
+            child.on('close', (code) => {
+                console.log(`[IPC] Streaming command completed with code: ${code}`);
+                
+                // Send completion signal
+                event.sender.send('stream-data', {
+                    channelId,
+                    data: '',
+                    isComplete: true
+                });
+                
+                resolve({
+                    success: true
+                });
+            });
+            
+            // Handle process errors
+            child.on('error', (error) => {
+                console.error(`[IPC] Streaming command failed:`, error);
+                
+                // Send error completion
+                event.sender.send('stream-data', {
+                    channelId,
+                    data: `Error: ${error.message}`,
+                    isComplete: true
+                });
+                
+                resolve({
+                    success: false,
+                    error: error.message
+                });
+            });
+            
+            // Set timeout for long-running commands
+            setTimeout(() => {
+                if (child.killed === false) {
+                    child.kill('SIGTERM');
+                    event.sender.send('stream-data', {
+                        channelId,
+                        data: '\nCommand timed out after 60 seconds',
+                        isComplete: true
+                    });
+                }
+            }, 60000);
+        });
+        
+    } catch (error) {
+        console.error(`[IPC] Streaming command setup failed:`, error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+});
+
+/**
  * Write log entries to the log file
  * @param {Array} logEntries - Array of log entry strings to write
  * @returns {Promise<{success: boolean, error?: string}>}

@@ -144,16 +144,50 @@ export function OpsPanel() {
       if (result.success && result.output) {
         // Parse and display actual system DNS configuration
         const lines = result.output.split(/\r?\n/).filter(line => line.trim());
+        
         if (lines.length === 0) {
           log(lang === "fa" ? "خروجی خالی دریافت شد" : "Empty output received", "warn");
         } else {
-          // Display each line of the actual DNS configuration
+          // Enhanced parsing to show DNS servers more clearly
+          let foundDnsServers = false;
+          let primaryDns = null;
+          let secondaryDns = null;
+          
           lines.forEach(line => {
             const trimmed = line.trim();
             if (trimmed) {
-              log(trimmed, "ok");
+              // Check if this line contains a DNS server IP
+              const ipMatch = trimmed.match(/(\d+\.\d+\.\d+\.\d+)/);
+              if (ipMatch) {
+                const ip = ipMatch[1];
+                if (!primaryDns) {
+                  primaryDns = ip;
+                  log(`${lang === "fa" ? "DNS اصلی" : "Primary DNS"}: ${ip}`, "ok");
+                } else if (!secondaryDns) {
+                  secondaryDns = ip;
+                  log(`${lang === "fa" ? "DNS فرعی" : "Secondary DNS"}: ${ip}`, "ok");
+                }
+                foundDnsServers = true;
+              } else {
+                // Log other configuration lines
+                log(trimmed, "info");
+              }
             }
           });
+          
+          // If no DNS servers found, might be DHCP
+          if (!foundDnsServers) {
+            const dhcpLines = lines.filter(line => 
+              line.toLowerCase().includes('dhcp') || 
+              line.toLowerCase().includes('automatic')
+            );
+            
+            if (dhcpLines.length > 0) {
+              log(lang === "fa" ? "DNS از DHCP دریافت می‌شود" : "DNS obtained from DHCP", "info");
+            } else {
+              log(lang === "fa" ? "هیچ DNS سرور پیدا نشد" : "No DNS servers found", "warn");
+            }
+          }
         }
         toast.success(t.current);
       } else {
@@ -173,6 +207,14 @@ export function OpsPanel() {
       console.error("Error executing DNS query:", error);
       log(lang === "fa" ? "خطا در اجرای دستور DNS" : "Error executing DNS command", "err");
       toast.error(lang === "fa" ? "خطا در خواندن DNS" : "Error reading DNS");
+      
+      // Show cached state as fallback on error
+      log(lang === "fa" ? "نمایش حالت کش‌شده:" : "Showing cached state:", "info");
+      if (dns.source === "dhcp") {
+        log(lang === "fa" ? "منبع: DHCP" : "Source: DHCP", "info");
+      } else {
+        log(`${dns.primary ?? "—"} / ${dns.secondary ?? "—"}`, "info");
+      }
     } finally {
       setBusy(false);
     }

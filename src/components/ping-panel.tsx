@@ -20,6 +20,209 @@ interface PingResult {
   error?: string;
 }
 
+async function executeStreamingPing(host: string, count: number, onProgress: (data: { n: number; ms: number | null; text: string }) => void): Promise<PingResult> {
+  logger.info('PING', `Starting streaming ping test to ${host} with ${count} packets`);
+  
+  // Sanitize host input to prevent command injection
+  const safeHost = sanitizeHost(host);
+  if (!safeHost) {
+    logger.error('PING', 'Invalid host provided', { originalHost: host });
+    return {
+      success: false,
+      times: [],
+      packetsLost: count,
+      avgTime: 0,
+      error: "Invalid host format"
+    };
+  }
+  
+  // Use streaming ping command through Electron IPC
+  if (typeof window !== "undefined" && window.electronAPI?.executeStreamCommand) {
+    try {
+      const command = `ping ${safeHost} -n ${count}`;
+      logger.debug('PING', `Executing streaming ping command: ${command}`);
+      
+      const times: number[] = [];
+      let packetNumber = 0;
+      
+      const result = await window.electronAPI.executeStreamCommand(command, (streamData) => {
+        if (streamData.data && !streamData.isComplete) {
+          const lines = streamData.data.split(/\r?\n/).filter(line => line.trim());
+          
+          for (const line of lines) {
+            // Parse each ping response line
+            const timeMatch = line.match(/time[<=](\d+)ms/i);
+            if (timeMatch) {
+              packetNumber++;
+              const ms = parseInt(timeMatch[1], 10);
+              times.push(ms);
+              onProgress({
+                n: packetNumber,
+                ms: ms,
+                text: line.trim()
+              });
+            } else if (line.includes('Request timed out') || line.includes('Destination host unreachable')) {
+              packetNumber++;
+              onProgress({
+                n: packetNumber,
+                ms: null,
+                text: line.trim()
+              });
+            }
+          }
+        }
+      });
+      
+      if (!result.success) {
+        logger.error('PING', 'Streaming ping command failed', { 
+          host, 
+          count, 
+          error: result.error 
+        });
+        return {
+          success: false,
+          times: [],
+          packetsLost: count,
+          avgTime: 0,
+          error: result.error || "Streaming ping command failed"
+        };
+      }
+
+      const packetsLost = count - times.length;
+      const avgTime = times.length > 0 
+        ? Math.round(times.reduce((sum, time) => sum + time, 0) / times.length)
+        : 0;
+
+      logger.info('PING', 'Streaming ping test completed successfully', {
+        host,
+        totalPackets: count,
+        successfulPackets: times.length,
+        packetsLost,
+        avgTime,
+        minTime: times.length > 0 ? Math.min(...times) : 0,
+        maxTime: times.length > 0 ? Math.max(...times) : 0
+      });
+
+      return {
+        success: true,
+        times,
+        packetsLost,
+        avgTime
+      };
+    } catch (error) {
+      logger.error('PING', 'Streaming ping execution failed', { host, count, error });
+      return {
+        success: false,
+        times: [],
+        packetsLost: count,
+        avgTime: 0,
+        error: error instanceof Error ? error.message : "Unknown error"
+      };
+    }
+  }
+
+  // Fallback to regular ping if streaming is not available
+  logger.warn('PING', 'Streaming API not available, falling back to regular ping');
+  return await executePing(host, count);
+}
+  logger.info('PING', `Starting ping test to ${host} with ${count} packets`);
+  
+  // Sanitize host input to prevent command injection
+  const safeHost = sanitizeHost(host);
+  if (!safeHost) {
+    logger.error('PING', 'Invalid host provided', { originalHost: host });
+    return {
+      success: false,
+      times: [],
+      packetsLost: count,
+      avgTime: 0,
+      error: "Invalid host format"
+    };
+  }
+  
+  // Use actual system ping command through Electron IPC
+  if (typeof window !== "undefined" && window.electronAPI?.executeCommand) {
+    try {
+      const command = `ping ${safeHost} -n ${count}`;
+      logger.debug('PING', `Executing ping command: ${command}`);
+      const result = await window.electronAPI.executeCommand(command);
+      
+      if (!result.success || !result.output) {
+        logger.error('PING', 'Ping command failed', { 
+          host, 
+          count, 
+          error: result.error 
+        });
+        return {
+          success: false,
+          times: [],
+          packetsLost: count,
+          avgTime: 0,
+          error: result.error || "Ping command failed"
+        };
+      }
+
+      // Parse Windows ping output
+      const output = result.output;
+      const times: number[] = [];
+      let packetsLost = 0;
+
+      logger.debug('PING', 'Parsing ping output', { outputLength: output.length });
+
+      // Extract ping times using regex
+      const timeRegex = /time[<=](\d+)ms/gi;
+      let match;
+      while ((match = timeRegex.exec(output)) !== null) {
+        times.push(parseInt(match[1], 10));
+      }
+
+      // Extract packet loss from statistics
+      const lossMatch = output.match(/\((\d+)% loss\)/i);
+      if (lossMatch) {
+        const lossPercent = parseInt(lossMatch[1], 10);
+        packetsLost = Math.round((count * lossPercent) / 100);
+      } else {
+        // If no explicit loss info, calculate from successful responses
+        packetsLost = count - times.length;
+      }
+
+      const avgTime = times.length > 0 
+        ? Math.round(times.reduce((sum, time) => sum + time, 0) / times.length)
+        : 0;
+
+      logger.info('PING', 'Ping test completed successfully', {
+        host,
+        totalPackets: count,
+        successfulPackets: times.length,
+        packetsLost,
+        avgTime,
+        minTime: Math.min(...times),
+        maxTime: Math.max(...times)
+      });
+
+      return {
+        success: true,
+        times,
+        packetsLost,
+        avgTime
+      };
+    } catch (error) {
+      logger.error('PING', 'Ping execution failed', { host, count, error });
+      return {
+        success: false,
+        times: [],
+        packetsLost: count,
+        avgTime: 0,
+        error: error instanceof Error ? error.message : "Unknown error"
+      };
+    }
+  }
+
+  // Fallback to HTTP probe for web/development mode
+  logger.warn('PING', 'Electron API not available, using fallback HTTP probe');
+  return await fallbackHttpProbe(host, count);
+}
+
 async function executePing(host: string, count: number): Promise<PingResult> {
   logger.info('PING', `Starting ping test to ${host} with ${count} packets`);
   
@@ -206,44 +409,92 @@ export function PingPanel() {
     log(`ping ${safeHost} -n ${finalCount}`, "cmd");
     
     try {
-      const result = await executePing(safeHost, finalCount);
+      // Use streaming ping for real-time output if available, fallback to regular ping
+      const useStreaming = typeof window !== "undefined" && window.electronAPI?.executeStreamCommand;
       
-      if (!result.success && result.error) {
-        log(result.error, "err");
-        toast.error(lang === "fa" ? "خطا در پینگ" : "Ping failed");
-        setBusy(false);
-        return;
-      }
+      if (useStreaming) {
+        const result = await executeStreamingPing(safeHost, finalCount, (data) => {
+          // Real-time update of ping results
+          setRows(currentRows => {
+            const newRows = [...currentRows];
+            
+            // Ensure we have enough rows
+            while (newRows.length < data.n) {
+              newRows.push({ n: newRows.length + 1, ms: null });
+            }
+            
+            // Update the specific row
+            if (newRows[data.n - 1]) {
+              newRows[data.n - 1] = { n: data.n, ms: data.ms };
+            }
+            
+            return newRows;
+          });
+          
+          // Log the ping result
+          log(
+            data.ms !== null 
+              ? `#${data.n} time=${data.ms}ms TTL=64`
+              : `#${data.n} ${t.probeFail}`,
+            data.ms !== null ? "ok" : "err",
+          );
+        });
+        
+        if (!result.success && result.error) {
+          log(result.error, "err");
+          toast.error(lang === "fa" ? "خطا در پینگ" : "Ping failed");
+        } else {
+          // Log summary
+          const recv = result.times.length;
+          const loss = Math.round(((finalCount - recv) / finalCount) * 100);
+          log(
+            lang === "fa" 
+              ? `خلاصه: ${recv}/${finalCount} دریافت شد، ${loss}% از دست رفت، میانگین: ${result.avgTime}ms`
+              : `Summary: ${recv}/${finalCount} received, ${loss}% loss, avg: ${result.avgTime}ms`,
+            "info"
+          );
+        }
+      } else {
+        // Fallback to non-streaming ping
+        const result = await executePing(safeHost, finalCount);
+        
+        if (!result.success && result.error) {
+          log(result.error, "err");
+          toast.error(lang === "fa" ? "خطا در پینگ" : "Ping failed");
+          setBusy(false);
+          return;
+        }
 
-      // Display results in real-time style for better UX
-      const newRows: Row[] = [];
-      
-      // Add successful pings
-      for (let i = 0; i < result.times.length; i++) {
-        newRows.push({ n: i + 1, ms: result.times[i] });
-        setRows([...newRows]);
+        // Display results in sequence for better UX
+        const newRows: Row[] = [];
+        
+        // Add successful pings
+        for (let i = 0; i < result.times.length; i++) {
+          newRows.push({ n: i + 1, ms: result.times[i] });
+          setRows([...newRows]);
+          log(
+            `#${i + 1} time=${result.times[i]}ms TTL=64`,
+            "ok",
+          );
+        }
+        
+        // Add failed pings
+        for (let i = result.times.length; i < finalCount; i++) {
+          newRows.push({ n: i + 1, ms: null });
+          setRows([...newRows]);
+          log(`#${i + 1} ${t.probeFail}`, "err");
+        }
+
+        // Log summary
+        const recv = result.times.length;
+        const loss = Math.round(((finalCount - recv) / finalCount) * 100);
         log(
-          `#${i + 1} time=${result.times[i]}ms TTL=64`,
-          "ok",
+          lang === "fa" 
+            ? `خلاصه: ${recv}/${finalCount} دریافت شد، ${loss}% از دست رفت، میانگین: ${result.avgTime}ms`
+            : `Summary: ${recv}/${finalCount} received, ${loss}% loss, avg: ${result.avgTime}ms`,
+          "info"
         );
       }
-      
-      // Add failed pings
-      for (let i = result.times.length; i < finalCount; i++) {
-        newRows.push({ n: i + 1, ms: null });
-        setRows([...newRows]);
-        log(`#${i + 1} ${t.probeFail}`, "err");
-      }
-
-      // Log summary
-      const recv = result.times.length;
-      const loss = Math.round(((finalCount - recv) / finalCount) * 100);
-      log(
-        lang === "fa" 
-          ? `خلاصه: ${recv}/${finalCount} دریافت شد، ${loss}% از دست رفت، میانگین: ${result.avgTime}ms`
-          : `Summary: ${recv}/${finalCount} received, ${loss}% loss, avg: ${result.avgTime}ms`,
-        "info"
-      );
 
     } catch (error) {
       log(lang === "fa" ? "خطا در اجرای پینگ" : "Ping execution error", "err");

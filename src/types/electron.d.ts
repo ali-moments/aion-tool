@@ -14,6 +14,16 @@ export interface CommandResult {
   error?: string;
 }
 
+export interface StreamCommandResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface StreamData {
+  data: string;
+  isComplete: boolean;
+}
+
 export interface NetworkInterfacesResult {
   success: boolean;
   adapters?: Adapter[];
@@ -34,6 +44,7 @@ export interface ElectronAPI {
   };
   executeCommand: (command: string) => Promise<CommandResult>;
   executeBatchCommands: (commands: string[]) => Promise<CommandResult>;
+  executeStreamCommand: (command: string, onData: (data: StreamData) => void) => Promise<StreamCommandResult>;
   getNetworkInterfaces: () => Promise<NetworkInterfacesResult>;
   writeLogs: (logEntries: string[]) => Promise<LogResult>;
   getLogPath: () => Promise<string>;

@@ -7,6 +7,8 @@ import {
   RefreshCw,
   TerminalSquare,
   Wifi,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Toaster } from "sonner";
 import { BootScreen } from "@/components/boot-screen";
@@ -31,19 +33,6 @@ const NAV: Array<{ id: ViewId; icon: typeof Globe; key: keyof typeof STR.fa }> =
   // { id: "kit", icon: Monitor, key: "navKit" }, // Disabled - Windows download page not currently used
 ];
 
-function Clock() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
-  return (
-    <span className="font-mono text-xs tabular-nums text-muted">
-      {now.toLocaleTimeString("en-GB", { hour12: false })}
-    </span>
-  );
-}
-
 export function CommandCenter() {
   const [hydrated, setHydrated] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,11 +44,13 @@ export function CommandCenter() {
   const dns = useApp((s) => s.dns);
   const adapters = useApp((s) => s.adapters);
   const lastOp = useApp((s) => s.lastOp);
+  const consoleVisible = useApp((s) => s.consoleVisible);
   const setLang = useApp((s) => s.setLang);
   const setView = useApp((s) => s.setView);
   const setIface = useApp((s) => s.setIface);
   const refreshAdapters = useApp((s) => s.refreshAdapters);
   const syncWithSystem = useApp((s) => s.syncWithSystem);
+  const toggleConsole = useApp((s) => s.toggleConsole);
   const t = STR[lang];
   const provider = providerById(dns.providerId);
 
@@ -70,22 +61,24 @@ export function CommandCenter() {
     return unsub;
   }, []);
 
-  // Auto-sync with system state after boot is complete
+  // Auto-sync with system state after boot is complete - but only once and more conservatively
   useEffect(() => {
     if (hydrated && bootDone) {
-      // Small delay to ensure everything is loaded
+      // Small delay to ensure everything is loaded, but don't sync too aggressively
       const timeoutId = setTimeout(async () => {
         try {
-          await syncWithSystem();
-          console.log("[CommandCenter] Initial system sync completed");
+          // Only refresh adapters list, don't sync DNS state automatically
+          // This prevents unwanted adapter switching during initial load
+          await refreshAdapters();
+          console.log("[CommandCenter] Initial adapter refresh completed");
         } catch (error) {
-          console.warn("[CommandCenter] Initial system sync failed:", error);
+          console.warn("[CommandCenter] Initial adapter refresh failed:", error);
         }
-      }, 1000);
+      }, 2000); // Increased delay to 2 seconds to be less aggressive
       
       return () => clearTimeout(timeoutId);
     }
-  }, [hydrated, bootDone, syncWithSystem]);
+  }, [hydrated, bootDone, refreshAdapters]); // Removed syncWithSystem dependency
 
   // Refresh network interfaces on mount (after boot screen)
   useEffect(() => {
@@ -138,14 +131,19 @@ export function CommandCenter() {
               <p className="text-xs text-muted">{t.subtitle}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <span className="inline-flex items-center gap-2 rounded-sm border border-border bg-elevated px-2.5 py-1 font-mono text-xs uppercase tracking-wider text-muted">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-sm border border-border bg-elevated px-2.5 py-1 font-mono text-xs uppercase tracking-wider text-muted",
+                  busy && "animate-[pulse-led_1s_ease-in-out_infinite]",
+                )}
+              >
                 <span
                   className={cn(
                     "size-1.5 rounded-full bg-primary",
                     busy && "animate-[pulse-led_1s_ease-in-out_infinite]",
                   )}
                 />
-                {busy ? t.statusBusy : t.statusReady}
+                {busy ? t.statusBusy : ""}
               </span>
               
               {/* Current DNS Display */}
@@ -154,11 +152,12 @@ export function CommandCenter() {
                 {dns.source === "dhcp" ? (
                   <span>{t.dhcp}</span>
                 ) : (
-                  <span>{dns.primary || "—"}</span>
+                  <span>
+                    {dns.primary || "—"} / {dns.secondary || "—"}
+                  </span>
                 )}
               </span>
               
-              <Clock />
               <Button size="sm" variant="outline" onClick={() => setLang(lang === "fa" ? "en" : "fa")}>
                 {t.lang}
               </Button>
@@ -259,25 +258,64 @@ export function CommandCenter() {
               {view === "kit" ? <KitPanel /> : null}
             </main>
 
-            <aside className="hidden w-[22rem] shrink-0 lg:block">
-              <ConsolePanel />
+            <aside className="hidden w-[22rem] shrink-0 lg:flex lg:flex-col">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-display text-sm tracking-wider text-muted">{t.console}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={toggleConsole}
+                      className="h-6 w-6 p-0"
+                    >
+                      {consoleVisible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {consoleVisible ? (lang === "fa" ? "پنهان کردن کنسول" : "Hide console") : (lang === "fa" ? "نمایش کنسول" : "Show console")}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="flex-1 min-h-0">
+                <ConsolePanel isVisible={consoleVisible} />
+              </div>
             </aside>
           </div>
 
           <div className="mt-3 lg:hidden">
-            <ConsolePanel />
+            <div className="mb-2 flex items-center justify-between">
+              <span className="font-display text-sm tracking-wider text-muted">{t.console}</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={toggleConsole}
+                    className="h-6 w-6 p-0"
+                  >
+                    {consoleVisible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {consoleVisible ? (lang === "fa" ? "پنهان کردن کنسول" : "Hide console") : (lang === "fa" ? "نمایش کنسول" : "Show console")}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="h-64">
+              <ConsolePanel isVisible={consoleVisible} />
+            </div>
           </div>
 
           <footer className="mt-4 mb-20 flex flex-col gap-2 border-t border-border pt-3 text-xs text-muted lg:mb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <span className="inline-flex items-center gap-2">
               <TerminalSquare className="size-3.5" />
-              {t.previewMode} · {t.liveLink} {t.online}
+              {t.previewMode}
             </span>
             <span className="truncate">
               {t.lastOp}: {lastOp || t.none}
               {provider ? ` · ${lang === "fa" ? provider.nameFa : provider.name}` : ""}
             </span>
-            <span className="text-muted/70">{t.createdBy}</span>
           </footer>
         </div>
 

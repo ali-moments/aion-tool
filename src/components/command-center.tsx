@@ -131,21 +131,6 @@ export function CommandCenter() {
               <p className="text-xs text-muted">{t.subtitle}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <span
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-sm border border-border bg-elevated px-2.5 py-1 font-mono text-xs uppercase tracking-wider text-muted",
-                  busy && "animate-[pulse-led_1s_ease-in-out_infinite]",
-                )}
-              >
-                <span
-                  className={cn(
-                    "size-1.5 rounded-full bg-primary",
-                    busy && "animate-[pulse-led_1s_ease-in-out_infinite]",
-                  )}
-                />
-                {busy ? t.statusBusy : ""}
-              </span>
-              
               {/* Current DNS Display */}
               <span className="hidden rounded-sm border border-border bg-elevated px-2.5 py-1 font-mono text-xs tracking-wider text-muted sm:inline-flex items-center gap-1.5">
                 <span className="text-primary">DNS:</span>
@@ -157,6 +142,24 @@ export function CommandCenter() {
                   </span>
                 )}
               </span>
+              
+              {/* Console Toggle Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={toggleConsole}
+                    className="gap-1.5"
+                  >
+                    {consoleVisible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    <span className="hidden sm:inline">{t.console}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {consoleVisible ? (lang === "fa" ? "پنهان کردن کنسول" : "Hide console") : (lang === "fa" ? "نمایش کنسول" : "Show console")}
+                </TooltipContent>
+              </Tooltip>
               
               <Button size="sm" variant="outline" onClick={() => setLang(lang === "fa" ? "en" : "fa")}>
                 {t.lang}
@@ -221,7 +224,10 @@ export function CommandCenter() {
               </div>
             </aside>
 
-            <main className="min-w-0 flex-1">
+            <main className={cn(
+              "min-w-0 flex-1 transition-all duration-300",
+              consoleVisible ? "lg:pr-3" : ""
+            )}>
               <div className="mb-3 flex flex-wrap items-center gap-2 lg:hidden">
                 <select
                   className="h-11 min-w-40 flex-1 rounded-md border border-border bg-elevated px-2 text-sm"
@@ -258,54 +264,27 @@ export function CommandCenter() {
               {view === "kit" ? <KitPanel /> : null}
             </main>
 
-            <aside className="hidden w-[22rem] shrink-0 lg:flex lg:flex-col">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="font-display text-sm tracking-wider text-muted">{t.console}</span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={toggleConsole}
-                      className="h-6 w-6 p-0"
-                    >
-                      {consoleVisible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {consoleVisible ? (lang === "fa" ? "پنهان کردن کنسول" : "Hide console") : (lang === "fa" ? "نمایش کنسول" : "Show console")}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <div className="flex-1 min-h-0">
-                <ConsolePanel isVisible={consoleVisible} />
-              </div>
+            {/* Desktop Console Panel */}
+            <aside className={cn(
+              "hidden shrink-0 lg:flex lg:flex-col transition-all duration-300",
+              consoleVisible ? "w-[22rem]" : "w-0 overflow-hidden"
+            )}>
+              {consoleVisible && (
+                <div className="flex flex-col h-[calc(100vh-8rem)]">
+                  <ConsolePanel isVisible={consoleVisible} />
+                </div>
+              )}
             </aside>
           </div>
 
-          <div className="mt-3 lg:hidden">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="font-display text-sm tracking-wider text-muted">{t.console}</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    onClick={toggleConsole}
-                    className="h-6 w-6 p-0"
-                  >
-                    {consoleVisible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {consoleVisible ? (lang === "fa" ? "پنهان کردن کنسول" : "Hide console") : (lang === "fa" ? "نمایش کنسول" : "Show console")}
-                </TooltipContent>
-              </Tooltip>
+          {/* Mobile Console Panel */}
+          {consoleVisible && (
+            <div className="mt-3 lg:hidden">
+              <div className="h-[calc(100vh-20rem)]">
+                <ConsolePanel isVisible={consoleVisible} />
+              </div>
             </div>
-            <div className="h-64">
-              <ConsolePanel isVisible={consoleVisible} />
-            </div>
-          </div>
+          )}
 
           <footer className="mt-4 mb-20 flex flex-col gap-2 border-t border-border pt-3 text-xs text-muted lg:mb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <span className="inline-flex items-center gap-2">

@@ -22,8 +22,8 @@ export function ConsolePanel({ isVisible = true }: { isVisible?: boolean }) {
   }
 
   return (
-    <Card className="flex h-full min-h-64 flex-col overflow-hidden">
-      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+    <Card className="flex h-full flex-col overflow-hidden">
+      <div className="flex items-center justify-between border-b border-border px-4 py-2.5 shrink-0">
         <p className="font-display text-sm tracking-wider text-muted">{t.console}</p>
         <Button variant="ghost" size="sm" onClick={clearLogs}>
           {t.clearLog}
